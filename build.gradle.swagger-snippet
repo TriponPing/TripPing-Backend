@@ -1,0 +1,6 @@
+// 기존 build.gradle의 dependencies { ... } 블록 안에 아래 한 줄만 추가하세요.
+// (Spring Boot 3.x 기준. Boot 2.x면 springdoc-openapi-ui:1.7.0 사용)
+
+dependencies {
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.5.0'
+}
