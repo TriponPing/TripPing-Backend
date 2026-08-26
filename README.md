@@ -12,7 +12,7 @@
 
 ## 실행 방법
 ```bash
-./gradlew bootRun
+
 ```
 
 ## API 문서 (Swagger)
