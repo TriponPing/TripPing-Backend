@@ -1,7 +1,7 @@
 package com.tripping.backend.route.service;
 
 import com.tripping.backend.route.dto.RegionSearchResponse;
-import com.tripping.backend.route.repository.RegionRepository;
+import com.tripping.backend.route.repository.RegionSearchRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import java.util.List;
@@ -10,7 +10,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class RegionService {
 
-    private final RegionRepository regionRepository;
+    private final RegionSearchRepository regionRepository;
 
     public List<RegionSearchResponse> searchRegions(String keyword) {
         return regionRepository.findByRegionNameContaining(keyword).stream()
