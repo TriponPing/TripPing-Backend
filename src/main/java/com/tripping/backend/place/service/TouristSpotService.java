@@ -2,7 +2,7 @@ package com.tripping.backend.place.service;
 
 import com.tripping.backend.entity.TouristSpot;
 import com.tripping.backend.place.dto.TouristSpotResponse;
-import com.tripping.backend.place.repository.TouristSpotRepository;
+import com.tripping.backend.place.repository.PlaceTouristSpotRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import java.util.List;
@@ -11,7 +11,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class TouristSpotService {
 
-    private final TouristSpotRepository touristSpotRepository;
+    private final PlaceTouristSpotRepository touristSpotRepository;
 
     // 지도 기반 반경 검색
     public List<TouristSpotResponse> searchByLocation(double lat, double lng, double radius) {
