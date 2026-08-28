@@ -6,7 +6,7 @@ import com.tripping.backend.entity.WidgetPing;
 import com.tripping.backend.ping.dto.OngoingTripResponse;
 import com.tripping.backend.ping.dto.PingRegisterRequest;
 import com.tripping.backend.ping.dto.PingResponse;
-import com.tripping.backend.ping.repository.ActualRouteRepository;
+import com.tripping.backend.ping.repository.PingActualRouteRepository;
 import com.tripping.backend.ping.repository.WidgetPingRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -21,7 +21,7 @@ import java.util.List;
 @Transactional(readOnly = true)
 public class PingService {
 
-    private final ActualRouteRepository actualRouteRepository;
+    private final PingActualRouteRepository actualRouteRepository;
     private final WidgetPingRepository widgetPingRepository;
 
     // 방문 장소 Ping 등록 - POST /routes/{routeId}/pings
