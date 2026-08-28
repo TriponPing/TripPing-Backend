@@ -88,4 +88,11 @@ public class PlannedRouteService {
             throw new IllegalArgumentException("본인의 루트만 수정할 수 있습니다.");
         }
     }
+
+    // 루트 이름으로 검색
+    public List<RouteSearchResponse> searchRoutesByTitle(String keyword) {
+        return plannedRouteRepository.findByTitleContaining(keyword).stream()
+                .map(RouteSearchResponse::new)
+                .toList();
+    }
 }

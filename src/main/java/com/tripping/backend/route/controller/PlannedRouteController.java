@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import java.util.List;
 
 @RestController
 @RequestMapping("/routes")
@@ -71,5 +72,13 @@ public class PlannedRouteController {
     ) {
         plannedRouteService.deletePlace(userDetails.getUserId(), routeId, routePlaceId);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/search")
+    @Operation(summary = "루트 이름으로 검색")
+    public ResponseEntity<List<RouteSearchResponse>> searchRoutes(
+            @RequestParam String keyword
+    ) {
+        return ResponseEntity.ok(plannedRouteService.searchRoutesByTitle(keyword));
     }
 }
