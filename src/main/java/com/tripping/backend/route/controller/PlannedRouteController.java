@@ -34,11 +34,11 @@ public class PlannedRouteController {
         return ResponseEntity.ok(plannedRouteService.getRouteDetail(routeId));
     }
 
-//    @GetMapping("/{routeId}/map")
-//    @Operation(summary = "지도 불러오기 (저장된 장소 포함)")
-//    public ResponseEntity<RouteMapResponse> getRouteMap(@PathVariable Long routeId) {
-//        return ResponseEntity.ok(plannedRouteService.getRouteMap(routeId));
-//    }
+    @GetMapping("/{routeId}/map")
+    @Operation(summary = "지도 불러오기 (저장된 장소 포함)")
+    public ResponseEntity<RouteMapResponse> getRouteMap(@PathVariable Long routeId) {
+        return ResponseEntity.ok(plannedRouteService.getRouteMap(routeId));
+    }
 
     @PostMapping("/{routeId}/places")
     @Operation(summary = "장소 추가")
