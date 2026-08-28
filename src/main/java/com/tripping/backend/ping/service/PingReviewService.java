@@ -6,7 +6,7 @@ import com.tripping.backend.entity.PingLog;
 import com.tripping.backend.ping.dto.PingReviewRequest;
 import com.tripping.backend.ping.dto.PingReviewResponse;
 import com.tripping.backend.ping.repository.PingActualRouteRepository;
-import com.tripping.backend.ping.repository.ActualRouteSpotRepository;
+import com.tripping.backend.ping.repository.PingActualRouteSpotRepository;
 import com.tripping.backend.ping.repository.PingLogRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -24,7 +24,7 @@ import org.springframework.web.server.ResponseStatusException;
 @Transactional(readOnly = true)
 public class PingReviewService {
 
-    private final ActualRouteSpotRepository actualRouteSpotRepository;
+    private final PingActualRouteSpotRepository actualRouteSpotRepository;
     private final PingActualRouteRepository actualRouteRepository;
     private final PingLogRepository pingLogRepository;
 
