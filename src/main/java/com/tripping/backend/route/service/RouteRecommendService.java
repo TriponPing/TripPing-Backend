@@ -33,7 +33,22 @@ public class RouteRecommendService {
             throw new IllegalArgumentException("추천 가능한 장소가 부족합니다. 지역 또는 제외 조건을 확인해주세요.");
         }
 
-        // 3. 서로 다른 시작점 5개 선정 (섞은 뒤 앞에서부터 선택)
+        // 3. 꼭 가고 싶은 장소들 (후보군 안에서)
+        List<Long> mustVisitIds = request.getMustVisitSpotIds() != null ? request.getMustVisitSpotIds() : List.of();
+        Map<Long, TouristSpot> candidateMap = new HashMap<>();
+        for (TouristSpot spot : candidates) {
+            candidateMap.put(spot.getSpotId(), spot);
+        }
+
+        List<TouristSpot> mustVisitSpots = new ArrayList<>();
+        for (Long id : mustVisitIds) {
+            TouristSpot spot = candidateMap.get(id);
+            if (spot != null) {
+                mustVisitSpots.add(spot);
+            }
+        }
+
+        // 4. 서로 다른 시작점 5개 선정 (섞은 뒤 앞에서부터 선택)
         List<TouristSpot> shuffled = new ArrayList<>(candidates);
         Collections.shuffle(shuffled);
         int startCount = Math.min(CANDIDATE_COUNT, shuffled.size());
@@ -42,33 +57,45 @@ public class RouteRecommendService {
 
         for (int i = 0; i < startCount; i++) {
             TouristSpot start = shuffled.get(i);
-            results.add(buildRoute(i + 1, start, candidates, request));
+            results.add(buildRoute(i + 1, start, candidates, mustVisitSpots, request));
         }
 
         return results;
     }
 
     // 하나의 시작점에서 그리디 알고리즘으로 루트 하나 생성
-    private RouteCandidateResponse buildRoute(int order, TouristSpot start, List<TouristSpot> candidates, RouteRecommendRequest request) {
+    // 꼭 가야 할 장소가 남아있으면 그 안에서, 없으면 전체 후보 중에서 "가장 가까운 곳"을 선택
+    private RouteCandidateResponse buildRoute(int order, TouristSpot start, List<TouristSpot> candidates,
+                                              List<TouristSpot> mustVisitSpots, RouteRecommendRequest request) {
         int maxSpotCount = request.getMaxSpotCount() != null ? request.getMaxSpotCount() : 5;
         int walkTimeLimit = request.getWalkTimeLimit() != null ? request.getWalkTimeLimit() : Integer.MAX_VALUE;
 
         List<TouristSpot> route = new ArrayList<>();
         Set<Long> visited = new HashSet<>();
+        Set<Long> mustVisitIds = new HashSet<>();
+        for (TouristSpot spot : mustVisitSpots) {
+            mustVisitIds.add(spot.getSpotId());
+        }
 
         route.add(start);
         visited.add(start.getSpotId());
-
+        TouristSpot current = start;
         double totalDistance = 0.0;
         int totalTime = 0;
-        TouristSpot current = start;
 
-        // 4. 가장 가까운 다음 장소를 계속 선택 (그리디)
         while (route.size() < maxSpotCount) {
+            // 아직 안 간 "꼭 가야 할 곳"이 있는지 확인
+            List<TouristSpot> remainingMustVisit = mustVisitSpots.stream()
+                    .filter(spot -> !visited.contains(spot.getSpotId()))
+                    .toList();
+
+            // 우선순위: 꼭 가야 할 곳이 남아있으면 그중에서, 없으면 전체 후보 중에서 선택
+            List<TouristSpot> searchPool = !remainingMustVisit.isEmpty() ? remainingMustVisit : candidates;
+
             TouristSpot nearest = null;
             double nearestDistance = Double.MAX_VALUE;
 
-            for (TouristSpot candidate : candidates) {
+            for (TouristSpot candidate : searchPool) {
                 if (visited.contains(candidate.getSpotId())) continue;
 
                 double distance = calculateDistance(current, candidate);
@@ -81,7 +108,10 @@ public class RouteRecommendService {
             if (nearest == null) break; // 더 이상 후보가 없으면 종료
 
             int additionalTime = (int) Math.round(nearestDistance / WALK_SPEED_KM_PER_HOUR * 60);
-            if (totalTime + additionalTime > walkTimeLimit) break; // 도보 시간 제한 초과하면 종료
+
+            // 꼭 가야 할 곳이면 시간 제한을 넘어도 강제로 포함 (필수 조건이 우선)
+            boolean isMustVisit = mustVisitIds.contains(nearest.getSpotId());
+            if (!isMustVisit && totalTime + additionalTime > walkTimeLimit) break;
 
             route.add(nearest);
             visited.add(nearest.getSpotId());
@@ -90,7 +120,7 @@ public class RouteRecommendService {
             current = nearest;
         }
 
-        // 5. 응답 DTO로 변환
+        // 응답 DTO로 변환
         List<RouteCandidateSpotResponse> spotResponses = new ArrayList<>();
         for (int i = 0; i < route.size(); i++) {
             spotResponses.add(new RouteCandidateSpotResponse(route.get(i), i + 1));
@@ -101,7 +131,7 @@ public class RouteRecommendService {
         return new RouteCandidateResponse(order, theme, round(totalDistance), totalTime, spotResponses);
     }
 
-    // 6. 루트 안 장소들의 category 비율로 테마 결정
+    // 루트 안 장소들의 category 비율로 테마 결정
     private String determineTheme(List<TouristSpot> route) {
         Map<String, Long> categoryCount = new HashMap<>();
         for (TouristSpot spot : route) {
