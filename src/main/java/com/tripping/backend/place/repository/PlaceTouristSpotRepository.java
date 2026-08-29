@@ -6,7 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import java.util.List;
 
-public interface TouristSpotRepository extends JpaRepository<TouristSpot, Long> {
+public interface PlaceTouristSpotRepository extends JpaRepository<TouristSpot, Long> {
 
     // 카테고리별 조회 (관광지/맛집/카페 공통)
     List<TouristSpot> findByCategory(String category);
