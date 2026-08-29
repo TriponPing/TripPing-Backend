@@ -14,6 +14,9 @@ public interface PlaceTouristSpotRepository extends JpaRepository<TouristSpot, L
     // 카테고리 + 지역 필터 조회
     List<TouristSpot> findByCategoryAndRegionId(String category, String regionId);
 
+    // 지역별 전체 장소 조회 (추천 알고리즘용 후보군)
+    List<TouristSpot> findByRegionId(String regionId);
+
     // 지도 기반 반경 검색 (Haversine 공식)
     @Query(value = """
         SELECT * FROM tourist_spot t
