@@ -119,7 +119,7 @@ public class MyPageController {
     @GetMapping("/map/search")
     public ResponseEntity<List<MapSearchResponse>> searchMap(
             @AuthenticationPrincipal CustomUserDetails userDetails,
-            @RequestParam("name") String keyword
+            @RequestParam("keyword") String keyword
     ) {
         requireLogin(userDetails);
         return ResponseEntity.ok(mapService.search(userDetails.getUserId(), keyword));
