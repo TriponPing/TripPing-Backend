@@ -8,6 +8,8 @@ import com.tripping.backend.route.repository.PlannedRouteRepository;
 import com.tripping.backend.route.repository.PlannedRouteSpotRepository;
 import com.tripping.backend.trip.dto.TripCreateRequest;
 import com.tripping.backend.trip.dto.TripResponse;
+import com.tripping.backend.trip.dto.TripRouteMapPlaceResponse;
+import com.tripping.backend.trip.dto.TripRouteMapSearchResponse;
 import com.tripping.backend.trip.repository.TripActualRouteRepository;
 import com.tripping.backend.trip.repository.TripActualRouteSpotRepository;
 import lombok.RequiredArgsConstructor;
@@ -57,5 +59,21 @@ public class TripService {
         }
 
         return new TripResponse(savedActualRoute);
+    }
+
+    // 지도용 루트 검색 (지역/카테고리 필터)
+    public java.util.List<TripRouteMapSearchResponse> searchRoutesForMap(String regionId, String category) {
+        java.util.List<Long> routeIds = actualRouteRepository.findMatchingRouteIds(regionId, category);
+
+        return routeIds.stream()
+                .map(routeId -> {
+                    java.util.List<TripRouteMapPlaceResponse> places = actualRouteSpotRepository
+                            .findMapSpotsByActualRouteId(routeId)
+                            .stream()
+                            .map(TripRouteMapPlaceResponse::new)
+                            .toList();
+                    return new TripRouteMapSearchResponse(routeId, places);
+                })
+                .toList();
     }
 }

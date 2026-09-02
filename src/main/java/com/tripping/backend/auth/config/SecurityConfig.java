@@ -26,7 +26,9 @@ public class SecurityConfig {
 
     // 로그인이나 회원가입처럼, 로그인을 안 한 상태에서도 접근할 수 있어야 하는 URL 목록
     private static final String[] ALLOW_LIST = {
-            "/auth/join", "/auth/login"
+            "/auth/join", "/auth/login",
+            "/places/**", "/map/places/**",   // 테스트용으로 임시 추가
+            "/routes/map/search"
     };
 
     // 1. 비밀번호를 암호화할 때 사용할 BCrypt 인코더 빈 등록
