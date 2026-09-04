@@ -63,8 +63,7 @@ public class PingController {
         }
     }
 
-    // PingController.java 등에 추가
-
+    @Operation(summary = "장소별 핑 통계 조회", description = "특정 장소의 실시간 인기 시간대 및 총 핑 개수를 조회합니다.")
     @GetMapping("/spots/{spotId}/ping-stats")
     public ResponseEntity<SpotPingStatsResponse> getSpotPingStats(@PathVariable Long spotId) {
         SpotPingStatsResponse stats = pingService.getSpotPingStats(spotId);
