@@ -1,5 +1,6 @@
 package com.tripping.backend.trip.service;
 
+import com.tripping.backend.trip.dto.CurrentTripResponse;
 import com.tripping.backend.entity.ActualRoute;
 import com.tripping.backend.entity.ActualRouteSpot;
 import com.tripping.backend.entity.PlannedRoute;
@@ -24,6 +25,14 @@ public class TripService {
     private final PlannedRouteSpotRepository plannedRouteSpotRepository;
     private final TripActualRouteRepository actualRouteRepository;
     private final TripActualRouteSpotRepository actualRouteSpotRepository;
+
+
+    // ⭐️ [추가] Ping 탭 등에서 현재 진행 중인 여행 정보를 조회하는 메서드
+    public CurrentTripResponse getCurrentInProgressRoute(Long userId) {
+        return actualRouteRepository.findFirstInProgressRoute(userId)
+                .map(CurrentTripResponse::new)
+                .orElse(null);
+    }
 
     // 실제 여행으로 저장 (PlannedRoute -> ActualRoute 복사)
     public TripResponse createTrip(Long userId, Long routeId, TripCreateRequest request) {
