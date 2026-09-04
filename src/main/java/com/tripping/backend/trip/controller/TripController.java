@@ -1,6 +1,7 @@
 package com.tripping.backend.trip.controller;
 
 import com.tripping.backend.auth.service.CustomUserDetails;
+import com.tripping.backend.trip.dto.CurrentTripResponse;
 import com.tripping.backend.trip.dto.TripCreateRequest;
 import com.tripping.backend.trip.dto.TripResponse;
 import com.tripping.backend.trip.dto.TripRouteMapSearchResponse;
@@ -37,5 +38,21 @@ public class TripController {
             @RequestParam(required = false) String category
     ) {
         return ResponseEntity.ok(tripService.searchRoutesForMap(regionId, category));
+    }
+
+    // ⭐️ [추가] Ping 탭 등에서 id 없이도 현재 진행 중인 여행을 스스로 조회하는 API
+    @GetMapping("/current")
+    @Operation(summary = "진행 중인 여행 조회", description = "유저의 IN_PROGRESS 상태인 최신 여행 정보를 조회합니다.")
+    public ResponseEntity<CurrentTripResponse> getCurrentRoute(
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        Long userId = userDetails != null ? userDetails.getUserId() : 1L; // 임시 방어 코드
+
+        CurrentTripResponse response = tripService.getCurrentInProgressRoute(userId); // 서비스 메서드명 일치화
+
+        if (response == null) {
+            return ResponseEntity.noContent().build(); // 진행 중인 여행이 없으면 204 No Content
+        }
+        return ResponseEntity.ok(response); // 있으면 200 OK + 데이터
     }
 }
