@@ -1,11 +1,13 @@
 package com.tripping.backend.mypage.service;
 
 import com.tripping.backend.entity.ActualRoute;
+import com.tripping.backend.entity.ActualRouteSpot;
 import com.tripping.backend.entity.SavedRoute;
 import com.tripping.backend.mypage.dto.PageResponse;
 import com.tripping.backend.mypage.dto.SavedRouteResponse;
 import com.tripping.backend.mypage.dto.SavedRouteSaveResponse;
 import com.tripping.backend.mypage.repository.MyPageActualRouteRepository;
+import com.tripping.backend.mypage.repository.MyPageActualRouteSpotRepository;
 import com.tripping.backend.mypage.repository.MyPageSavedRouteRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -26,6 +28,7 @@ public class MyPageRouteService {
 
     private final MyPageSavedRouteRepository savedRouteRepository;
     private final MyPageActualRouteRepository actualRouteRepository;
+    private final MyPageActualRouteSpotRepository actualRouteSpotRepository;
     private final RepresentativeSpotFinder representativeSpotFinder;
 
     // 저장한 루트 목록 조회 - GET /users/me/routes/saved
@@ -42,10 +45,18 @@ public class MyPageRouteService {
                         .collect(Collectors.toMap(ActualRoute::getActualRouteId, r -> r));
         Map<Long, RepresentativeSpotFinder.RepresentativeSpot> repByRoute = representativeSpotFinder.find(routeIds);
 
+        // 루트별 방문 장소 개수 ("핑 N개" 표시용) - 한 번에 조회해서 N+1 방지
+        Map<Long, Long> placeCountByRoute = routeIds.isEmpty()
+                ? Map.of()
+                : actualRouteSpotRepository
+                        .findByActualRouteIdInOrderByActualRouteIdAscVisitOrderAsc(routeIds).stream()
+                        .collect(Collectors.groupingBy(ActualRouteSpot::getActualRouteId, Collectors.counting()));
+
         List<SavedRouteResponse> content = page.getContent().stream()
                 .map(sr -> {
                     ActualRoute route = routeById.get(sr.getActualRouteId());
                     RepresentativeSpotFinder.RepresentativeSpot rep = repByRoute.get(sr.getActualRouteId());
+                    Long placeCount = placeCountByRoute.get(sr.getActualRouteId());
                     return new SavedRouteResponse(
                             sr.getSavedRouteId(),
                             sr.getActualRouteId(),
@@ -53,6 +64,7 @@ public class MyPageRouteService {
                             route != null ? route.getMemberCount() : null,
                             rep != null ? rep.spotName() : null,
                             rep != null ? rep.imageUrl() : null,
+                            placeCount != null ? placeCount.intValue() : 0,
                             sr.getCreatedAt()
                     );
                 })

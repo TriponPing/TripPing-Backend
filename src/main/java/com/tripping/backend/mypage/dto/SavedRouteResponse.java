@@ -14,6 +14,7 @@ public record SavedRouteResponse(
         Integer memberCount,
         String representativeSpotName,
         String representativeImageUrl,
+        Integer placeCount,        // 이 루트에 포함된 방문 장소(스팟) 개수 - 프론트 카드의 "핑 N개" 표시에 사용
         LocalDateTime savedAt
 ) {
 }
