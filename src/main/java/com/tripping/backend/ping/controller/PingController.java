@@ -4,6 +4,7 @@ import com.tripping.backend.auth.service.CustomUserDetails;
 import com.tripping.backend.ping.dto.OngoingTripResponse;
 import com.tripping.backend.ping.dto.PingRegisterRequest;
 import com.tripping.backend.ping.dto.PingResponse;
+import com.tripping.backend.ping.dto.SpotPingStatsResponse;
 import com.tripping.backend.ping.service.PingService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -60,5 +61,12 @@ public class PingController {
         if (userDetails == null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "로그인이 필요합니다.");
         }
+    }
+
+    @Operation(summary = "장소별 핑 통계 조회", description = "특정 장소의 실시간 인기 시간대 및 총 핑 개수를 조회합니다.")
+    @GetMapping("/spots/{spotId}/ping-stats")
+    public ResponseEntity<SpotPingStatsResponse> getSpotPingStats(@PathVariable Long spotId) {
+        SpotPingStatsResponse stats = pingService.getSpotPingStats(spotId);
+        return ResponseEntity.ok(stats);
     }
 }
