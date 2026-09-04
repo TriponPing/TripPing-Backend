@@ -109,14 +109,16 @@ public class MyPageTripService {
                 .map(spot -> {
                     PingLog log = logBySpot.get(spot.getActualRouteSpotId());
                     TouristSpot ts = touristSpotById.get(spot.getSpotId());
+                    // 좌표는 ts(TouristSpot)에서 - ActualRouteSpot.latitude/longitude는
+                    // "핑 등록 시점 실제 GPS"용이라 핑을 안 찍으면 항상 null임.
                     return new TripDetailResponse.SpotDetail(
                             spot.getVisitOrder(),
                             spot.getSpotId(),
                             ts != null ? ts.getName() : null,
                             ts != null ? ts.getCategory() : null,
                             ts != null ? ts.getAddress() : null,
-                            spot.getLatitude(),
-                            spot.getLongitude(),
+                            ts != null ? ts.getLatitude() : null,
+                            ts != null ? ts.getLongitude() : null,
                             spot.getVisitTime(),
                             log != null ? log.getRating() : null,
                             log != null ? log.getPhotoUrl() : null,
