@@ -57,16 +57,23 @@ public class MyPageTripService {
         List<Long> routeIds = routes.stream().map(ActualRoute::getActualRouteId).toList();
         Map<Long, RepresentativeSpotFinder.RepresentativeSpot> repByRoute = representativeSpotFinder.find(routeIds);
 
+        // 여행별 방문 장소 개수 ("핑 N개" 표시용) - 한 번에 조회해서 N+1 방지
+        Map<Long, Long> placeCountByRoute = actualRouteSpotRepository
+                .findByActualRouteIdInOrderByActualRouteIdAscVisitOrderAsc(routeIds).stream()
+                .collect(Collectors.groupingBy(ActualRouteSpot::getActualRouteId, Collectors.counting()));
+
         return routes.stream()
                 .map(route -> {
                     RepresentativeSpotFinder.RepresentativeSpot rep = repByRoute.get(route.getActualRouteId());
+                    Long placeCount = placeCountByRoute.get(route.getActualRouteId());
                     return new TripSummaryResponse(
                             route.getActualRouteId(),
                             route.getTravelDate(),
                             route.getStatus() != null ? route.getStatus().name() : null,
                             route.getMemberCount(),
                             rep != null ? rep.spotName() : null,
-                            rep != null ? rep.imageUrl() : null
+                            rep != null ? rep.imageUrl() : null,
+                            placeCount != null ? placeCount.intValue() : 0
                     );
                 })
                 .toList();

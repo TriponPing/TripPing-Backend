@@ -12,6 +12,7 @@ public record TripSummaryResponse(
         String status,
         Integer memberCount,
         String representativeSpotName,
-        String representativeImageUrl
+        String representativeImageUrl,
+        Integer placeCount // 이 여행에 포함된 방문 장소(스팟) 개수 - 프론트 카드의 "핑 N개" 표시에 사용
 ) {
 }
