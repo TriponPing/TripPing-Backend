@@ -63,7 +63,7 @@ public class MyPageTripService {
                     return new TripSummaryResponse(
                             route.getActualRouteId(),
                             route.getTravelDate(),
-                            route.getStatus().name(),
+                            route.getStatus() != null ? route.getStatus().name() : null,
                             route.getMemberCount(),
                             rep != null ? rep.spotName() : null,
                             rep != null ? rep.imageUrl() : null
@@ -124,7 +124,7 @@ public class MyPageTripService {
                 route.getCompanionType(),
                 route.getTransport(),
                 route.getMemberCount(),
-                route.getStatus().name(),
+                route.getStatus() != null ? route.getStatus().name() : null,
                 route.getIsPublic(),
                 spotDetails
         );
