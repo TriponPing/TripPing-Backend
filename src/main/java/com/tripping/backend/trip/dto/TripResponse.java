@@ -19,6 +19,6 @@ public class TripResponse {
         this.companionType = actualRoute.getCompanionType();
         this.transport = actualRoute.getTransport();
         this.memberCount = actualRoute.getMemberCount();
-        this.status = actualRoute.getStatus().name();
+        this.status = actualRoute.getStatus() != null ? actualRoute.getStatus().name() : null;
     }
 }

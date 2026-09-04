@@ -54,7 +54,7 @@ public class PingService {
 
         return new OngoingTripResponse(
                 route.getActualRouteId(),
-                route.getStatus().name(),
+                route.getStatus() != null ? route.getStatus().name() : null,
                 route.getTravelDate(),
                 pings
         );
