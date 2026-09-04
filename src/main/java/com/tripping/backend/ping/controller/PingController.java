@@ -4,6 +4,7 @@ import com.tripping.backend.auth.service.CustomUserDetails;
 import com.tripping.backend.ping.dto.OngoingTripResponse;
 import com.tripping.backend.ping.dto.PingRegisterRequest;
 import com.tripping.backend.ping.dto.PingResponse;
+import com.tripping.backend.ping.dto.SpotPingStatsResponse;
 import com.tripping.backend.ping.service.PingService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -60,5 +61,13 @@ public class PingController {
         if (userDetails == null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "로그인이 필요합니다.");
         }
+    }
+
+    // PingController.java 등에 추가
+
+    @GetMapping("/spots/{spotId}/ping-stats")
+    public ResponseEntity<SpotPingStatsResponse> getSpotPingStats(@PathVariable Long spotId) {
+        SpotPingStatsResponse stats = pingService.getSpotPingStats(spotId);
+        return ResponseEntity.ok(stats);
     }
 }

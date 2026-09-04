@@ -13,6 +13,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import com.tripping.backend.ping.dto.SpotPingStatsResponse;
 
 import java.util.List;
 
@@ -72,4 +73,27 @@ public class PingService {
         return actualRouteRepository.findByActualRouteIdAndUserIdAndIsDeletedFalse(routeId, userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "여행을 찾을 수 없습니다."));
     }
+
+    // 💡 특정 장소의 '인기 시간대'와 '총 핑 개수'를 계산해서 반환하는 메서드
+    public SpotPingStatsResponse getSpotPingStats(Long spotId) {
+        // 1. 총 핑 개수 조회
+        long totalCount = widgetPingRepository.countBySpotIdAndIsDeletedFalse(spotId);
+
+        if (totalCount == 0) {
+            return new SpotPingStatsResponse("정보 없음", 0);
+        }
+
+        // 2. 시간대별 핑 개수 집계 결과 가져오기 (내림차순 정렬되어 있음)
+        List<Object[]> slotCounts = widgetPingRepository.countPingsByTimeSlot(spotId);
+
+        // 3. 가장 핑이 많이 찍힌 1위 시간대 추출 (첫 번째 결과의 0번째 인덱스가 timeSlot 문자열)
+        String topTimeSlot = "정보 없음";
+        if (!slotCounts.isEmpty()) {
+            topTimeSlot = (String) slotCounts.get(0)[0];
+        }
+
+        return new SpotPingStatsResponse(topTimeSlot, totalCount);
+    }
+
+
 }
