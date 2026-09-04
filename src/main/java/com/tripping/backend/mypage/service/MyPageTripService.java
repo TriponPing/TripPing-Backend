@@ -57,16 +57,23 @@ public class MyPageTripService {
         List<Long> routeIds = routes.stream().map(ActualRoute::getActualRouteId).toList();
         Map<Long, RepresentativeSpotFinder.RepresentativeSpot> repByRoute = representativeSpotFinder.find(routeIds);
 
+        // 여행별 방문 장소 개수 ("핑 N개" 표시용) - 한 번에 조회해서 N+1 방지
+        Map<Long, Long> placeCountByRoute = actualRouteSpotRepository
+                .findByActualRouteIdInOrderByActualRouteIdAscVisitOrderAsc(routeIds).stream()
+                .collect(Collectors.groupingBy(ActualRouteSpot::getActualRouteId, Collectors.counting()));
+
         return routes.stream()
                 .map(route -> {
                     RepresentativeSpotFinder.RepresentativeSpot rep = repByRoute.get(route.getActualRouteId());
+                    Long placeCount = placeCountByRoute.get(route.getActualRouteId());
                     return new TripSummaryResponse(
                             route.getActualRouteId(),
                             route.getTravelDate(),
                             route.getStatus() != null ? route.getStatus().name() : null,
                             route.getMemberCount(),
                             rep != null ? rep.spotName() : null,
-                            rep != null ? rep.imageUrl() : null
+                            rep != null ? rep.imageUrl() : null,
+                            placeCount != null ? placeCount.intValue() : 0
                     );
                 })
                 .toList();
@@ -102,14 +109,16 @@ public class MyPageTripService {
                 .map(spot -> {
                     PingLog log = logBySpot.get(spot.getActualRouteSpotId());
                     TouristSpot ts = touristSpotById.get(spot.getSpotId());
+                    // 좌표는 ts(TouristSpot)에서 - ActualRouteSpot.latitude/longitude는
+                    // "핑 등록 시점 실제 GPS"용이라 핑을 안 찍으면 항상 null임.
                     return new TripDetailResponse.SpotDetail(
                             spot.getVisitOrder(),
                             spot.getSpotId(),
                             ts != null ? ts.getName() : null,
                             ts != null ? ts.getCategory() : null,
                             ts != null ? ts.getAddress() : null,
-                            spot.getLatitude(),
-                            spot.getLongitude(),
+                            ts != null ? ts.getLatitude() : null,
+                            ts != null ? ts.getLongitude() : null,
                             spot.getVisitTime(),
                             log != null ? log.getRating() : null,
                             log != null ? log.getPhotoUrl() : null,

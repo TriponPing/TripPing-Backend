@@ -101,12 +101,14 @@ public class MyPageMapService {
                     List<MapDetailResponse.SpotPoint> spotPoints = spotsByRoute.getOrDefault(routeId, List.of()).stream()
                             .map(spot -> {
                                 TouristSpot ts = touristSpotById.get(spot.getSpotId());
+                                // 좌표는 ts(TouristSpot)에서 - ActualRouteSpot.latitude/longitude는
+                                // "핑 등록 시점 실제 GPS"용이라 핑을 안 찍으면 항상 null임.
                                 return new MapDetailResponse.SpotPoint(
                                         spot.getVisitOrder(),
                                         spot.getSpotId(),
                                         ts != null ? ts.getName() : null,
-                                        spot.getLatitude(),
-                                        spot.getLongitude(),
+                                        ts != null ? ts.getLatitude() : null,
+                                        ts != null ? ts.getLongitude() : null,
                                         spot.getVisitTime()
                                 );
                             })
