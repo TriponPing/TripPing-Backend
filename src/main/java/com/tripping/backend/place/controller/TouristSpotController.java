@@ -35,12 +35,16 @@ public class TouristSpotController {
     }
 
     @GetMapping("/places")
-    @Operation(summary = "탐색 지도 필터 기능", description = "스펙상 PATCH였으나 조회 동작이라 GET으로 변경. 현재 지역 필터만 지원, 혼잡도/시간대/Ping수는 추후 반영")
+    @Operation(summary = "탐색 지도 필터 기능", description = "지역/시간대/핑개수 필터 지원")
     public ResponseEntity<List<TouristSpotResponse>> getByCategoryAndFilters(
             @RequestParam String category,
-            @RequestParam(required = false) String regionId
+            @RequestParam(required = false) String regionId,
+            @RequestParam(required = false) String timeSlot,
+            @RequestParam(required = false) Integer minPingCount
     ) {
-        return ResponseEntity.ok(touristSpotService.getByCategoryAndFilters(category, regionId));
+        return ResponseEntity.ok(
+                touristSpotService.getByCategoryAndFilters(category, regionId, timeSlot, minPingCount)
+        );
     }
 
     @GetMapping("/places/{placeId}")
