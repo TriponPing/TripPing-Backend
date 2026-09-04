@@ -18,4 +18,7 @@ public interface MyPageSavedRouteRepository extends JpaRepository<SavedRoute, Lo
 
     // 루트 저장 취소(북마크 해제) 시 조회
     Optional<SavedRoute> findByUserIdAndActualRouteId(Long userId, Long actualRouteId);
+
+    // 루트 저장(북마크) 시 중복 저장 방지용
+    boolean existsByUserIdAndActualRouteId(Long userId, Long actualRouteId);
 }

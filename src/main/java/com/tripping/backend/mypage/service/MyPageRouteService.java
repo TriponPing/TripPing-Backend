@@ -4,6 +4,7 @@ import com.tripping.backend.entity.ActualRoute;
 import com.tripping.backend.entity.SavedRoute;
 import com.tripping.backend.mypage.dto.PageResponse;
 import com.tripping.backend.mypage.dto.SavedRouteResponse;
+import com.tripping.backend.mypage.dto.SavedRouteSaveResponse;
 import com.tripping.backend.mypage.repository.MyPageActualRouteRepository;
 import com.tripping.backend.mypage.repository.MyPageSavedRouteRepository;
 import lombok.RequiredArgsConstructor;
@@ -68,5 +69,28 @@ public class MyPageRouteService {
                 .findByUserIdAndActualRouteId(userId, actualRouteId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "저장된 루트를 찾을 수 없습니다."));
         savedRouteRepository.delete(savedRoute);
+    }
+
+    // 루트 저장(북마크) - POST /routes/{routeId}/saved
+    // routeId = 북마크할 ACTUAL_ROUTE의 id (다른 사람이 공개해둔 다녀온 여행)
+    @Transactional
+    public SavedRouteSaveResponse saveRoute(Long userId, Long actualRouteId) {
+        ActualRoute route = actualRouteRepository.findById(actualRouteId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "존재하지 않는 루트입니다."));
+
+        if (route.getUserId().equals(userId)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "본인의 루트는 저장할 수 없습니다.");
+        }
+
+        boolean alreadySaved = savedRouteRepository.existsByUserIdAndActualRouteId(userId, actualRouteId);
+        if (!alreadySaved) {
+            SavedRoute savedRoute = SavedRoute.builder()
+                    .userId(userId)
+                    .actualRouteId(actualRouteId)
+                    .build();
+            savedRouteRepository.save(savedRoute);
+        }
+
+        return new SavedRouteSaveResponse(actualRouteId, true);
     }
 }
