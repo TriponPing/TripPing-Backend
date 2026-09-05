@@ -3,10 +3,12 @@ package com.tripping.backend.place.service;
 import com.tripping.backend.entity.TouristSpot;
 import com.tripping.backend.ping.dto.SpotPingStatsResponse;
 import com.tripping.backend.ping.service.PingService;
+import com.tripping.backend.place.dto.CreatePlaceRequest;
 import com.tripping.backend.place.dto.TouristSpotResponse;
 import com.tripping.backend.place.repository.PlaceTouristSpotRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 
 @Service
@@ -72,5 +74,22 @@ public class TouristSpotService {
         return touristSpotRepository.findById(placeId)
                 .map(TouristSpotResponse::new)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 장소입니다. id=" + placeId));
+    }
+
+    // 👈 새로 추가: 새 장소 등록 - POST /places
+    // 네이버맵 POI 등 아직 우리 DB에 없는 장소를 클라이언트가 새로 등록할 때 씀
+    // ⚠️ TouristSpot.builder() 구성은 SavedPlace 엔티티의 빌더 패턴을 보고 추측했습니다.
+    // 실제 TouristSpot 엔티티 파일 보여주시면 정확히 맞춰드릴게요.
+    @Transactional
+    public TouristSpotResponse createPlace(CreatePlaceRequest request) {
+        TouristSpot spot = TouristSpot.builder()
+                .name(request.name())
+                .category(request.category())
+                .latitude(request.latitude())
+                .longitude(request.longitude())
+                .build();
+
+        TouristSpot saved = touristSpotRepository.save(spot);
+        return new TouristSpotResponse(saved);
     }
 }

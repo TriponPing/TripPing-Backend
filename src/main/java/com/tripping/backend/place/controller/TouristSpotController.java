@@ -1,10 +1,13 @@
 package com.tripping.backend.place.controller;
 
+import com.tripping.backend.place.dto.CreatePlaceRequest;
 import com.tripping.backend.place.dto.TouristSpotResponse;
 import com.tripping.backend.place.service.TouristSpotService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
@@ -53,5 +56,13 @@ public class TouristSpotController {
             @PathVariable Long placeId
     ) {
         return ResponseEntity.ok(touristSpotService.getDetail(placeId));
+    }
+
+    // 새로 추가: 새 장소 등록 - POST /places
+    @PostMapping("/places")
+    @Operation(summary = "새 장소 등록", description = "네이버맵 등에서 발견한, 아직 우리 DB에 없는 장소를 새로 등록합니다.")
+    public ResponseEntity<TouristSpotResponse> createPlace(@Valid @RequestBody CreatePlaceRequest request) {
+        TouristSpotResponse response = touristSpotService.createPlace(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 }
