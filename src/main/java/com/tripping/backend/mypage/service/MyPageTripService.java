@@ -80,10 +80,18 @@ public class MyPageTripService {
     }
 
     // 여행 기록 상세 조회 - GET /users/me/trips/{tripId}
+    // 본인이 다녀온 여행뿐 아니라, 다른 사람이 공개해둔 루트를 저장(북마크)해서 보는 경우도 있어서
+    // 소유자가 아니어도 공개(isPublic) 루트면 조회 가능하게 함. (저장한 여행 카드 -> 상세보기, 여행 바로 시작하기)
     public TripDetailResponse getTripDetail(Long userId, Long tripId) {
         ActualRoute route = actualRouteRepository
-                .findByActualRouteIdAndUserIdAndIsDeletedFalse(tripId, userId)
+                .findByActualRouteIdAndIsDeletedFalse(tripId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "여행 기록을 찾을 수 없습니다."));
+
+        boolean isOwner = route.getUserId().equals(userId);
+        boolean isPublic = Boolean.TRUE.equals(route.getIsPublic());
+        if (!isOwner && !isPublic) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "비공개 루트입니다.");
+        }
 
         List<ActualRouteSpot> spots = actualRouteSpotRepository
                 .findByActualRouteIdOrderByVisitOrderAsc(tripId);

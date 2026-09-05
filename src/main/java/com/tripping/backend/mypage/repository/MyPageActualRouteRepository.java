@@ -19,6 +19,10 @@ public interface MyPageActualRouteRepository extends JpaRepository<ActualRoute, 
     // 여행 기록 상세 조회 - 본인 소유인지까지 함께 검증
     Optional<ActualRoute> findByActualRouteIdAndUserIdAndIsDeletedFalse(Long actualRouteId, Long userId);
 
+    // 여행 기록 상세 조회 - 소유자 제한 없음 (본인 것이 아니어도 공개 루트면 조회 가능해야 해서,
+    // 소유/공개 여부 판단은 서비스 레이어에서 함)
+    Optional<ActualRoute> findByActualRouteIdAndIsDeletedFalse(Long actualRouteId);
+
     // 나의 여행 지도(drawn) - 내가 다녀온 여행 전체
     List<ActualRoute> findByUserIdAndIsDeletedFalse(Long userId);
 }
