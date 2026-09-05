@@ -1,12 +1,11 @@
 package com.tripping.backend.mypage.service;
 
-// 뱃지 고정 카탈로그. TODO: 실제 뱃지 획득 조건/종류가 정해지면 DB 테이블로 옮기고
-// 획득 로직(여행 작성 횟수, 연속 출석일 등)을 여기 대신 별도 서비스에서 계산하도록 교체.
-// 지금은 모든 유저가 이 카탈로그 전부를 "획득한" 상태로 취급하고, 그중 뭘 프로필에
-// 노출할지(featured)만 UserBadgeSetting으로 관리함.
+// 뱃지 고정 카탈로그. 지금은 일부러 비워둠 - "추가 작성자"/"연속 출석"은 실제 기획 없이
+// 임시로 넣었던 가짜 뱃지라 제거함. 조회/저장(GET·PUT /users/me/badges) 기능 자체는
+// 그대로 살아있고, 실제 뱃지 종류/획득 조건이 정해지면 여기 enum 상수로 추가하면 됨
+// (그러면 MyPageBadgeService가 알아서 유저별로 노출 여부를 관리해줌).
 public enum BadgeCatalog {
-    AUTHOR("추가 작성자", "📷"),
-    ATTENDANCE("연속 출석", "📅");
+    ;
 
     private final String label;
     private final String emoji;
