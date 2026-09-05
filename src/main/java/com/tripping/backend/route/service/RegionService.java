@@ -1,7 +1,7 @@
 package com.tripping.backend.route.service;
 
 import com.tripping.backend.route.dto.RegionSearchResponse;
-<<<<<<< Updated upstream
+
 import com.tripping.backend.route.repository.RegionSearchRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -19,12 +19,3 @@ public class RegionService {
                 .toList();
     }
 }
-=======
-
-import java.util.List;
-
-public class RegionService {
-    public List<RegionSearchResponse> searchRegions(String keyword) {
-    }
-}
->>>>>>> Stashed changes

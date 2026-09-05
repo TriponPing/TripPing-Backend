@@ -25,9 +25,9 @@ public class PingService {
     private final WidgetPingRepository widgetPingRepository;
 
     // 방문 장소 Ping 등록 - POST /routes/{routeId}/pings
-    // 👈 원래는 "진행 중(IN_PROGRESS)인 여행에만" 등록 가능하도록 막혀 있었는데,
-    // "다녀온(완료된) 여행"에 나중에 빠뜨린 장소를 추가하는 기능도 이 API를 쓰게 되면서
-    // 그 제약이 걸림돌이 되어 제거함. 본인 소유 여행인지(findOwnedRoute)만 검증하면 충분함.
+    // 👈 RouteStatus는 IN_PROGRESS/COMPLETED 둘뿐이라 상태별 화이트리스트는 사실상 의미가 없음.
+    // "다녀온(완료) 여행"에도 핑 추가를 허용해야 하므로 상태 제약은 두지 않음.
+    // 여행 자체가 존재하고 본인 소유인지(findOwnedRoute)만 검증하면 충분함.
     @Transactional
     public PingResponse registerPing(Long userId, Long routeId, PingRegisterRequest request) {
         ActualRoute route = findOwnedRoute(userId, routeId);
