@@ -2,6 +2,7 @@ package com.tripping.backend.mypage.controller;
 
 import com.tripping.backend.auth.service.CustomUserDetails;
 import com.tripping.backend.mypage.dto.*;
+import com.tripping.backend.mypage.service.MyPageBadgeService;
 import com.tripping.backend.mypage.service.MyPageMapService;
 import com.tripping.backend.mypage.service.MyPageProfileService;
 import com.tripping.backend.mypage.service.MyPageRouteService;
@@ -30,6 +31,7 @@ public class MyPageController {
     private final MyPageTripService tripService;
     private final MyPageRouteService routeService;
     private final MyPageMapService mapService;
+    private final MyPageBadgeService badgeService;
 
     @Operation(summary = "프로필 조회", description = "로그인한 유저의 프로필 정보를 조회합니다.")
     @GetMapping
@@ -123,6 +125,25 @@ public class MyPageController {
     ) {
         requireLogin(userDetails);
         return ResponseEntity.ok(mapService.search(userDetails.getUserId(), keyword));
+    }
+
+    @Operation(summary = "뱃지 목록 조회", description = "유저의 전체 뱃지 목록과, 그중 프로필에 노출 중인(꺼낸) 뱃지 여부를 조회합니다.")
+    @GetMapping("/badges")
+    public ResponseEntity<List<BadgeResponse>> getMyBadges(
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        requireLogin(userDetails);
+        return ResponseEntity.ok(badgeService.getMyBadges(userDetails.getUserId()));
+    }
+
+    @Operation(summary = "꺼낼 뱃지 수정", description = "프로필에 노출할 뱃지 목록을 통째로 교체합니다.")
+    @PutMapping("/badges/featured")
+    public ResponseEntity<List<BadgeResponse>> updateFeaturedBadges(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @RequestBody UpdateFeaturedBadgesRequest request
+    ) {
+        requireLogin(userDetails);
+        return ResponseEntity.ok(badgeService.updateFeaturedBadges(userDetails.getUserId(), request.featuredBadgeCodes()));
     }
 
     private void requireLogin(CustomUserDetails userDetails) {
