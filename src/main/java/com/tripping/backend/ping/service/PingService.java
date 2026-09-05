@@ -1,7 +1,6 @@
 package com.tripping.backend.ping.service;
 
 import com.tripping.backend.entity.ActualRoute;
-import com.tripping.backend.entity.RouteStatus;
 import com.tripping.backend.entity.WidgetPing;
 import com.tripping.backend.ping.dto.OngoingTripResponse;
 import com.tripping.backend.ping.dto.PingRegisterRequest;
@@ -26,12 +25,12 @@ public class PingService {
     private final WidgetPingRepository widgetPingRepository;
 
     // 방문 장소 Ping 등록 - POST /routes/{routeId}/pings
+    // 👈 원래는 "진행 중(IN_PROGRESS)인 여행에만" 등록 가능하도록 막혀 있었는데,
+    // "다녀온(완료된) 여행"에 나중에 빠뜨린 장소를 추가하는 기능도 이 API를 쓰게 되면서
+    // 그 제약이 걸림돌이 되어 제거함. 본인 소유 여행인지(findOwnedRoute)만 검증하면 충분함.
     @Transactional
     public PingResponse registerPing(Long userId, Long routeId, PingRegisterRequest request) {
         ActualRoute route = findOwnedRoute(userId, routeId);
-        if (route.getStatus() != RouteStatus.IN_PROGRESS) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "진행 중인 여행에만 핑을 등록할 수 있습니다.");
-        }
 
         WidgetPing ping = WidgetPing.builder()
                 .actualRouteId(routeId)
@@ -54,7 +53,7 @@ public class PingService {
 
         return new OngoingTripResponse(
                 route.getActualRouteId(),
-                route.getStatus().name(),
+                route.getStatus() != null ? route.getStatus().name() : null,
                 route.getTravelDate(),
                 pings
         );
@@ -74,19 +73,16 @@ public class PingService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "여행을 찾을 수 없습니다."));
     }
 
-    // 💡 특정 장소의 '인기 시간대'와 '총 핑 개수'를 계산해서 반환하는 메서드
+    // 특정 장소의 '인기 시간대'와 '총 핑 개수'를 계산해서 반환하는 메서드
     public SpotPingStatsResponse getSpotPingStats(Long spotId) {
-        // 1. 총 핑 개수 조회
         long totalCount = widgetPingRepository.countBySpotIdAndIsDeletedFalse(spotId);
 
         if (totalCount == 0) {
             return new SpotPingStatsResponse("정보 없음", 0);
         }
 
-        // 2. 시간대별 핑 개수 집계 결과 가져오기 (내림차순 정렬되어 있음)
         List<Object[]> slotCounts = widgetPingRepository.countPingsByTimeSlot(spotId);
 
-        // 3. 가장 핑이 많이 찍힌 1위 시간대 추출 (첫 번째 결과의 0번째 인덱스가 timeSlot 문자열)
         String topTimeSlot = "정보 없음";
         if (!slotCounts.isEmpty()) {
             topTimeSlot = (String) slotCounts.get(0)[0];
@@ -94,6 +90,4 @@ public class PingService {
 
         return new SpotPingStatsResponse(topTimeSlot, totalCount);
     }
-
-
 }
