@@ -31,6 +31,11 @@ public class SecurityConfig {
             "/routes/map/search"
     };
 
+    // permitAll 경로에서 에러(400/401 등)가 나면 스프링이 내부적으로 /error 로 다시 요청을 보내는데,
+    // /error 자체가 인증을 요구하면 원래 에러 대신 403이 떠서 진짜 원인이 가려짐. 그래서 /error는
+    // 요청 종류(dispatcher type)와 상관없이 항상 허용해야 함.
+    private static final String[] ERROR_PATH = { "/error" };
+
     // 1. 비밀번호를 암호화할 때 사용할 BCrypt 인코더 빈 등록
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -52,6 +57,7 @@ public class SecurityConfig {
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)) // 세션이 필요할 때만 생성
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(ERROR_PATH).permitAll() // /error 내부 재전송은 항상 허용 (진짜 에러 코드가 403에 가려지는 것 방지)
                         .requestMatchers(ALLOW_LIST).permitAll() // ALLOW_LIST에 있는 주소는 로그인 없이 누구나 접근 가능
                         .requestMatchers("/swagger-ui/**").permitAll()// Swagger 문서 접근 허용
                         .requestMatchers("/v3/api-docs/**").permitAll() // Swagger API Docs 허용
