@@ -11,6 +11,9 @@ import org.springframework.data.repository.query.Param;
 
 public interface HomeActualRouteSpotRepository extends JpaRepository<ActualRouteSpot, Long> {
 
+    /** "이번주 인기 여행" 카드에 표시할 방문 순서대로의 스팟 목록 (spotId, 사진, 이름은 TouristSpot에서 별도 조회). */
+    List<ActualRouteSpot> findByActualRouteIdOrderByVisitOrderAsc(Long actualRouteId);
+
     /**
      * "떠오르는 인기 장소": 최근 visitTime 기준으로 방문(핑) 기록이 많은 관광지 spotId 를
      * 방문 횟수 내림차순으로 조회합니다. Pageable 로 상위 N개만 잘라옵니다.

@@ -2,10 +2,14 @@ package com.tripping.backend.home.service;
 
 import com.tripping.backend.auth.repository.UserRepository;
 import com.tripping.backend.entity.ActualRoute;
+import com.tripping.backend.entity.ActualRouteSpot;
 import com.tripping.backend.entity.AppUser;
+import com.tripping.backend.entity.TouristSpot;
 import com.tripping.backend.home.dto.response.PopularTripResponse;
 import com.tripping.backend.home.repository.HomeActualRouteRepository;
+import com.tripping.backend.home.repository.HomeActualRouteSpotRepository;
 import com.tripping.backend.home.repository.HomeSavedRouteRepository;
+import com.tripping.backend.home.repository.HomeTouristSpotRepository;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -28,6 +32,8 @@ public class PopularTripService {
 
     private final HomeSavedRouteRepository savedRouteRepository;
     private final HomeActualRouteRepository actualRouteRepository;
+    private final HomeActualRouteSpotRepository actualRouteSpotRepository;
+    private final HomeTouristSpotRepository touristSpotRepository;
     private final UserRepository userRepository; // auth 도메인의 AppUser Repository를 그대로 재사용합니다.
 
     public List<PopularTripResponse> getPopularTrips(String period, int limit) {
@@ -47,10 +53,34 @@ public class PopularTripService {
         return popularRouteIds.stream()
                 .map(routeById::get)
                 .filter(route -> route != null)
-                .map(route -> PopularTripResponse.from(
-                        route,
-                        findNickname(route.getUserId()),
-                        savedRouteRepository.countRecentSavesByRouteId(route.getActualRouteId(), since)))
+                .map(route -> {
+                    List<ActualRouteSpot> spots = actualRouteSpotRepository
+                            .findByActualRouteIdOrderByVisitOrderAsc(route.getActualRouteId());
+                    Map<Long, TouristSpot> spotById = touristSpotRepository
+                            .findAllById(spots.stream().map(ActualRouteSpot::getSpotId).toList())
+                            .stream()
+                            .collect(java.util.stream.Collectors.toMap(TouristSpot::getSpotId, s -> s));
+
+                    List<String> stopNames = spots.stream()
+                            .map(s -> spotById.get(s.getSpotId()))
+                            .filter(s -> s != null)
+                            .map(TouristSpot::getName)
+                            .toList();
+                    String photoUrl = spots.stream()
+                            .map(s -> spotById.get(s.getSpotId()))
+                            .filter(s -> s != null)
+                            .map(TouristSpot::getImageUrl)
+                            .filter(url -> url != null && !url.isBlank())
+                            .findFirst()
+                            .orElse(null);
+
+                    return PopularTripResponse.from(
+                            route,
+                            findNickname(route.getUserId()),
+                            savedRouteRepository.countRecentSavesByRouteId(route.getActualRouteId(), since),
+                            stopNames,
+                            photoUrl);
+                })
                 .toList();
     }
 

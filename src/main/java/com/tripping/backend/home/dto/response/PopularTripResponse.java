@@ -4,6 +4,7 @@ import com.tripping.backend.entity.ActualRoute;
 import com.tripping.backend.entity.RouteStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDate;
+import java.util.List;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -36,7 +37,15 @@ public class PopularTripResponse {
     @Schema(description = "이번 주 저장(찜) 수", example = "12")
     private Long savedCount;
 
-    public static PopularTripResponse from(ActualRoute route, String writerNickname, long savedCount) {
+    @Schema(description = "방문 순서대로의 스팟 이름 목록", example = "[\"성수\", \"서울 숲\", \"한강\"]")
+    private List<String> stopNames;
+
+    @Schema(description = "대표 사진 URL (첫 방문 스팟의 관광지 사진, 없으면 null)")
+    private String photoUrl;
+
+    public static PopularTripResponse from(
+            ActualRoute route, String writerNickname, long savedCount, List<String> stopNames, String photoUrl
+    ) {
         return PopularTripResponse.builder()
                 .routeId(route.getActualRouteId())
                 .writerNickname(writerNickname)
@@ -46,6 +55,8 @@ public class PopularTripResponse {
                 .memberCount(route.getMemberCount())
                 .status(route.getStatus())
                 .savedCount(savedCount)
+                .stopNames(stopNames)
+                .photoUrl(photoUrl)
                 .build();
     }
 }
