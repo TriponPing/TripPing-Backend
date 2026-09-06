@@ -95,9 +95,9 @@ public class MyPageController {
         return ResponseEntity.ok(routeService.getSavedRoutes(userDetails.getUserId(), pageable));
     }
 
-    @Operation(summary = "나의 여행 지도 조회", description = "다녀온 여행 + 저장한 루트를 지도에 찍을 핀 목록(대표 좌표)으로 조회합니다.")
+    @Operation(summary = "나의 여행 지도 조회", description = "다녀온 여행 + 저장한 루트를 지도에 찍을 핀 목록(대표 좌표)과, 다녀온 장소 개수(저장한 루트 제외, 중복 제거)를 조회합니다.")
     @GetMapping("/map")
-    public ResponseEntity<List<MapPinResponse>> getMyMap(
+    public ResponseEntity<MyMapResponse> getMyMap(
             @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
         requireLogin(userDetails);

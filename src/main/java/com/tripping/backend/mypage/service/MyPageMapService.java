@@ -9,6 +9,7 @@ import com.tripping.backend.entity.TouristSpot;
 import com.tripping.backend.mypage.dto.MapDetailResponse;
 import com.tripping.backend.mypage.dto.MapPinResponse;
 import com.tripping.backend.mypage.dto.MapSearchResponse;
+import com.tripping.backend.mypage.dto.MyMapResponse;
 import com.tripping.backend.mypage.repository.MyPageActualRouteRepository;
 import com.tripping.backend.mypage.repository.MyPageActualRouteSpotRepository;
 import com.tripping.backend.mypage.repository.MyPageSavedRouteRepository;
@@ -50,7 +51,7 @@ public class MyPageMapService {
     private final RepresentativeSpotFinder representativeSpotFinder;
 
     // 나의 여행 지도 조회 - GET /users/me/map
-    public List<MapPinResponse> getMyMap(Long userId) {
+    public MyMapResponse getMyMap(Long userId) {
         List<ActualRoute> drawnRoutes = actualRouteRepository.findByUserIdAndIsDeletedFalse(userId);
         List<SavedRoute> savedRoutes = savedRouteRepository.findByUserId(userId);
 
@@ -69,7 +70,16 @@ public class MyPageMapService {
         for (Long routeId : savedIds) {
             pins.add(toPin(routeById.get(routeId), repByRoute.get(routeId), TYPE_SAVED));
         }
-        return pins;
+
+        // "다녀온 장소" 개수 - 저장한 루트는 빼고, 내가 실제로 다녀온 여행에 포함된 장소만
+        // 중복(같은 곳 여러 번 방문) 제거해서 셈
+        int visitedPlaceCount = drawnIds.isEmpty() ? 0 : (int) actualRouteSpotRepository
+                .findByActualRouteIdInOrderByActualRouteIdAscVisitOrderAsc(drawnIds).stream()
+                .map(ActualRouteSpot::getSpotId)
+                .distinct()
+                .count();
+
+        return new MyMapResponse(pins, visitedPlaceCount);
     }
 
     // 나의 여행 지도 상세 조회 - GET /users/me/map/detail?type=drawn|saved|planned
