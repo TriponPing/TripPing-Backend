@@ -1,6 +1,7 @@
 package com.tripping.backend.route.service;
 
 import com.tripping.backend.route.dto.RegionSearchResponse;
+
 import com.tripping.backend.route.repository.RegionSearchRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
