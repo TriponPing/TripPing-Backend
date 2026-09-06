@@ -2,6 +2,8 @@ package com.tripping.backend.mypage.service;
 
 import com.tripping.backend.entity.ActualRoute;
 import com.tripping.backend.entity.ActualRouteSpot;
+import com.tripping.backend.entity.PlannedRoute;
+import com.tripping.backend.entity.PlannedRouteSpot;
 import com.tripping.backend.entity.SavedRoute;
 import com.tripping.backend.entity.TouristSpot;
 import com.tripping.backend.mypage.dto.MapDetailResponse;
@@ -11,6 +13,8 @@ import com.tripping.backend.mypage.repository.MyPageActualRouteRepository;
 import com.tripping.backend.mypage.repository.MyPageActualRouteSpotRepository;
 import com.tripping.backend.mypage.repository.MyPageSavedRouteRepository;
 import com.tripping.backend.mypage.repository.MyPageTouristSpotRepository;
+import com.tripping.backend.route.repository.PlannedRouteRepository;
+import com.tripping.backend.route.repository.PlannedRouteSpotRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,11 +39,14 @@ public class MyPageMapService {
 
     private static final String TYPE_DRAWN = "DRAWN";
     private static final String TYPE_SAVED = "SAVED";
+    private static final String TYPE_PLANNED = "PLANNED";
 
     private final MyPageActualRouteRepository actualRouteRepository;
     private final MyPageActualRouteSpotRepository actualRouteSpotRepository;
     private final MyPageSavedRouteRepository savedRouteRepository;
     private final MyPageTouristSpotRepository touristSpotRepository;
+    private final PlannedRouteRepository plannedRouteRepository;
+    private final PlannedRouteSpotRepository plannedRouteSpotRepository;
     private final RepresentativeSpotFinder representativeSpotFinder;
 
     // 나의 여행 지도 조회 - GET /users/me/map
@@ -65,8 +72,12 @@ public class MyPageMapService {
         return pins;
     }
 
-    // 나의 여행 지도 상세 조회 - GET /users/me/map/detail?type=drawn|saved
+    // 나의 여행 지도 상세 조회 - GET /users/me/map/detail?type=drawn|saved|planned
     public List<MapDetailResponse> getMyMapDetail(Long userId, String type) {
+        if ("planned".equalsIgnoreCase(type)) {
+            return getPlannedMapDetail(userId);
+        }
+
         boolean isSaved = "saved".equalsIgnoreCase(type);
 
         List<Long> routeIds = isSaved
@@ -117,6 +128,51 @@ public class MyPageMapService {
                             routeId,
                             route != null ? route.getTravelDate() : null,
                             typeLabel,
+                            spotPoints
+                    );
+                })
+                .toList();
+    }
+
+    // 나의 여행 지도 > 내 계획 - 아직 실제 여행으로 시작 안 한 계획들의 전체 경로
+    private List<MapDetailResponse> getPlannedMapDetail(Long userId) {
+        List<PlannedRoute> plans = plannedRouteRepository.findByUserIdAndIsDeletedFalseAndIsStartedFalse(userId);
+        if (plans.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> planIds = plans.stream().map(PlannedRoute::getPlannedRouteId).toList();
+        List<PlannedRouteSpot> spots = plannedRouteSpotRepository
+                .findByPlannedRouteIdInOrderByPlannedRouteIdAscVisitOrderAsc(planIds);
+
+        List<Long> touristSpotIds = spots.stream().map(PlannedRouteSpot::getSpotId).distinct().toList();
+        Map<Long, TouristSpot> touristSpotById = touristSpotIds.isEmpty()
+                ? Map.of()
+                : touristSpotRepository.findAllById(touristSpotIds).stream()
+                        .collect(Collectors.toMap(TouristSpot::getSpotId, ts -> ts));
+
+        Map<Long, List<PlannedRouteSpot>> spotsByPlan = spots.stream()
+                .collect(Collectors.groupingBy(PlannedRouteSpot::getPlannedRouteId, LinkedHashMap::new, Collectors.toList()));
+
+        return plans.stream()
+                .map(plan -> {
+                    List<MapDetailResponse.SpotPoint> spotPoints = spotsByPlan.getOrDefault(plan.getPlannedRouteId(), List.of()).stream()
+                            .map(spot -> {
+                                TouristSpot ts = touristSpotById.get(spot.getSpotId());
+                                return new MapDetailResponse.SpotPoint(
+                                        spot.getVisitOrder(),
+                                        spot.getSpotId(),
+                                        ts != null ? ts.getName() : null,
+                                        ts != null ? ts.getLatitude() : null,
+                                        ts != null ? ts.getLongitude() : null,
+                                        null // 계획 단계라 실제 방문 시각은 없음
+                                );
+                            })
+                            .toList();
+                    return new MapDetailResponse(
+                            plan.getPlannedRouteId(),
+                            plan.getCreatedAt() != null ? plan.getCreatedAt().toLocalDate() : null,
+                            TYPE_PLANNED,
                             spotPoints
                     );
                 })
