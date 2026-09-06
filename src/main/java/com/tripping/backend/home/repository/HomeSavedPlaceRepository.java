@@ -35,4 +35,12 @@ public interface HomeSavedPlaceRepository extends JpaRepository<SavedPlace, Long
         WHERE sp.spotId = :spotId AND sp.createdAt >= :since
         """)
     long countRecentSavesBySpotId(@Param("spotId") Long spotId, @Param("since") LocalDateTime since);
+
+    /** 특정 유저가 저장(북마크)한 장소 spotId 전체 목록. "인기 장소" 화면의 북마크 초기 상태 복원용. */
+    @Query("""
+        SELECT sp.spotId
+        FROM SavedPlace sp
+        WHERE sp.userId = :userId
+        """)
+    List<Long> findSpotIdsByUserId(@Param("userId") Long userId);
 }
