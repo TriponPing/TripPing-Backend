@@ -55,6 +55,10 @@ public class TripService {
 
         ActualRoute savedActualRoute = actualRouteRepository.save(actualRoute);
 
+        // 2-1. 계획을 "시작함"으로 표시 - 나의 여행 지도 > 내 계획 탭에서 더 이상 안 보이게
+        plannedRoute.setIsStarted(true);
+        plannedRouteRepository.save(plannedRoute);
+
         // 3. PlannedRouteSpot들을 ActualRouteSpot으로 복사
         List<PlannedRouteSpot> plannedSpots = plannedRouteSpotRepository.findByPlannedRouteId(routeId);
 

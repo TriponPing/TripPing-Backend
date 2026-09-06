@@ -95,24 +95,24 @@ public class MyPageController {
         return ResponseEntity.ok(routeService.getSavedRoutes(userDetails.getUserId(), pageable));
     }
 
-    @Operation(summary = "나의 여행 지도 조회", description = "다녀온 여행 + 저장한 루트를 지도에 찍을 핀 목록(대표 좌표)으로 조회합니다.")
+    @Operation(summary = "나의 여행 지도 조회", description = "다녀온 여행 + 저장한 루트를 지도에 찍을 핀 목록(대표 좌표)과, 다녀온 장소 개수(저장한 루트 제외, 중복 제거)를 조회합니다.")
     @GetMapping("/map")
-    public ResponseEntity<List<MapPinResponse>> getMyMap(
+    public ResponseEntity<MyMapResponse> getMyMap(
             @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
         requireLogin(userDetails);
         return ResponseEntity.ok(mapService.getMyMap(userDetails.getUserId()));
     }
 
-    @Operation(summary = "나의 여행 지도 상세 조회", description = "type=drawn(내가 다녀온 여행) 또는 saved(저장한 루트)별로 전체 경로를 조회합니다.")
+    @Operation(summary = "나의 여행 지도 상세 조회", description = "type=drawn(내가 다녀온 여행) / saved(저장한 루트) / planned(내 계획, 아직 시작 안 한 것)별로 전체 경로를 조회합니다.")
     @GetMapping("/map/detail")
     public ResponseEntity<List<MapDetailResponse>> getMyMapDetail(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @RequestParam String type
     ) {
         requireLogin(userDetails);
-        if (!"drawn".equalsIgnoreCase(type) && !"saved".equalsIgnoreCase(type)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "type은 drawn 또는 saved만 가능합니다.");
+        if (!"drawn".equalsIgnoreCase(type) && !"saved".equalsIgnoreCase(type) && !"planned".equalsIgnoreCase(type)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "type은 drawn, saved, planned만 가능합니다.");
         }
         return ResponseEntity.ok(mapService.getMyMapDetail(userDetails.getUserId(), type));
     }
