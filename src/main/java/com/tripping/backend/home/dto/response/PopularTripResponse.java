@@ -43,8 +43,20 @@ public class PopularTripResponse {
     @Schema(description = "대표 사진 URL (첫 방문 스팟의 관광지 사진, 없으면 null)")
     private String photoUrl;
 
+    @Schema(description = "총 Ping(방문 스팟) 개수")
+    private long pingCount;
+
+    @Schema(description = "실제 GPS 핑이 찍힌 방문 순서대로의 좌표 목록 (핑이 없는 스팟은 제외, 지도/경로 표시용)")
+    private List<CoordinateResponse> coordinates;
+
     public static PopularTripResponse from(
-            ActualRoute route, String writerNickname, long savedCount, List<String> stopNames, String photoUrl
+            ActualRoute route,
+            String writerNickname,
+            long savedCount,
+            List<String> stopNames,
+            String photoUrl,
+            long pingCount,
+            List<CoordinateResponse> coordinates
     ) {
         return PopularTripResponse.builder()
                 .routeId(route.getActualRouteId())
@@ -57,6 +69,8 @@ public class PopularTripResponse {
                 .savedCount(savedCount)
                 .stopNames(stopNames)
                 .photoUrl(photoUrl)
+                .pingCount(pingCount)
+                .coordinates(coordinates)
                 .build();
     }
 }

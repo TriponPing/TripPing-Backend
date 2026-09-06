@@ -5,6 +5,7 @@ import com.tripping.backend.entity.ActualRoute;
 import com.tripping.backend.entity.ActualRouteSpot;
 import com.tripping.backend.entity.AppUser;
 import com.tripping.backend.entity.TouristSpot;
+import com.tripping.backend.home.dto.response.CoordinateResponse;
 import com.tripping.backend.home.dto.response.PopularTripResponse;
 import com.tripping.backend.home.repository.HomeActualRouteRepository;
 import com.tripping.backend.home.repository.HomeActualRouteSpotRepository;
@@ -74,12 +75,23 @@ public class PopularTripService {
                             .findFirst()
                             .orElse(null);
 
+                    // 핑 등록 시점 실제 GPS 좌표. 핑을 안 찍은 스팟은 null이라 여기서 걸러짐 -> 프론트 지도/경로 표시용
+                    List<CoordinateResponse> coordinates = spots.stream()
+                            .filter(s -> s.getLatitude() != null && s.getLongitude() != null)
+                            .map(s -> CoordinateResponse.builder()
+                                    .latitude(s.getLatitude().doubleValue())
+                                    .longitude(s.getLongitude().doubleValue())
+                                    .build())
+                            .toList();
+
                     return PopularTripResponse.from(
                             route,
                             findNickname(route.getUserId()),
                             savedRouteRepository.countRecentSavesByRouteId(route.getActualRouteId(), since),
                             stopNames,
-                            photoUrl);
+                            photoUrl,
+                            spots.size(),
+                            coordinates);
                 })
                 .toList();
     }
