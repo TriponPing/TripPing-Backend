@@ -4,6 +4,7 @@ import com.tripping.backend.entity.ActualRoute;
 import com.tripping.backend.entity.ActualRouteSpot;
 import com.tripping.backend.entity.PlannedRoute;
 import com.tripping.backend.entity.PlannedRouteSpot;
+import com.tripping.backend.entity.SavedPlace;
 import com.tripping.backend.entity.SavedRoute;
 import com.tripping.backend.entity.TouristSpot;
 import com.tripping.backend.mypage.dto.MapDetailResponse;
@@ -12,6 +13,7 @@ import com.tripping.backend.mypage.dto.MapSearchResponse;
 import com.tripping.backend.mypage.dto.MyMapResponse;
 import com.tripping.backend.mypage.repository.MyPageActualRouteRepository;
 import com.tripping.backend.mypage.repository.MyPageActualRouteSpotRepository;
+import com.tripping.backend.mypage.repository.MyPageSavedPlaceRepository;
 import com.tripping.backend.mypage.repository.MyPageSavedRouteRepository;
 import com.tripping.backend.mypage.repository.MyPageTouristSpotRepository;
 import com.tripping.backend.route.repository.PlannedRouteRepository;
@@ -41,10 +43,12 @@ public class MyPageMapService {
     private static final String TYPE_DRAWN = "DRAWN";
     private static final String TYPE_SAVED = "SAVED";
     private static final String TYPE_PLANNED = "PLANNED";
+    private static final String TYPE_PLACE = "PLACE";
 
     private final MyPageActualRouteRepository actualRouteRepository;
     private final MyPageActualRouteSpotRepository actualRouteSpotRepository;
     private final MyPageSavedRouteRepository savedRouteRepository;
+    private final MyPageSavedPlaceRepository savedPlaceRepository;
     private final MyPageTouristSpotRepository touristSpotRepository;
     private final PlannedRouteRepository plannedRouteRepository;
     private final PlannedRouteSpotRepository plannedRouteSpotRepository;
@@ -82,10 +86,13 @@ public class MyPageMapService {
         return new MyMapResponse(pins, visitedPlaceCount);
     }
 
-    // 나의 여행 지도 상세 조회 - GET /users/me/map/detail?type=drawn|saved|planned
+    // 나의 여행 지도 상세 조회 - GET /users/me/map/detail?type=drawn|saved|planned|places
     public List<MapDetailResponse> getMyMapDetail(Long userId, String type) {
         if ("planned".equalsIgnoreCase(type)) {
             return getPlannedMapDetail(userId);
+        }
+        if ("places".equalsIgnoreCase(type)) {
+            return getPlacesMapDetail(userId);
         }
 
         boolean isSaved = "saved".equalsIgnoreCase(type);
@@ -184,6 +191,39 @@ public class MyPageMapService {
                             plan.getCreatedAt() != null ? plan.getCreatedAt().toLocalDate() : null,
                             TYPE_PLANNED,
                             spotPoints
+                    );
+                })
+                .toList();
+    }
+
+    // 나의 여행 지도 > 저장한 장소 - 북마크(핀)로 저장한 단일 장소들. 경로가 아니라 장소 하나하나라
+    // 각 장소를 스팟 1개짜리 "루트"로 만들어서 기존 MapDetailResponse 포맷을 그대로 재사용함(선은 안 그려짐, 핀만 찍힘).
+    private List<MapDetailResponse> getPlacesMapDetail(Long userId) {
+        List<SavedPlace> savedPlaces = savedPlaceRepository.findByUserId(userId);
+        if (savedPlaces.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> spotIds = savedPlaces.stream().map(SavedPlace::getSpotId).distinct().toList();
+        Map<Long, TouristSpot> touristSpotById = touristSpotRepository.findAllById(spotIds).stream()
+                .collect(Collectors.toMap(TouristSpot::getSpotId, ts -> ts));
+
+        return savedPlaces.stream()
+                .map(sp -> {
+                    TouristSpot ts = touristSpotById.get(sp.getSpotId());
+                    MapDetailResponse.SpotPoint spotPoint = new MapDetailResponse.SpotPoint(
+                            1,
+                            sp.getSpotId(),
+                            ts != null ? ts.getName() : null,
+                            ts != null ? ts.getLatitude() : null,
+                            ts != null ? ts.getLongitude() : null,
+                            null
+                    );
+                    return new MapDetailResponse(
+                            sp.getSavedPlaceId(),
+                            sp.getCreatedAt() != null ? sp.getCreatedAt().toLocalDate() : null,
+                            TYPE_PLACE,
+                            List.of(spotPoint)
                     );
                 })
                 .toList();
