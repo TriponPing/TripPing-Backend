@@ -14,8 +14,10 @@ import com.tripping.backend.trip.dto.TripRouteMapSearchResponse;
 import com.tripping.backend.trip.repository.TripActualRouteRepository;
 import com.tripping.backend.trip.repository.TripActualRouteSpotRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import java.util.List;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
 @RequiredArgsConstructor
@@ -27,11 +29,16 @@ public class TripService {
     private final TripActualRouteSpotRepository actualRouteSpotRepository;
 
 
-    // ⭐️ [추가] Ping 탭 등에서 현재 진행 중인 여행 정보를 조회하는 메서드
-    public CurrentTripResponse getCurrentInProgressRoute(Long userId) {
-        return actualRouteRepository.findFirstInProgressRoute(userId)
-                .map(CurrentTripResponse::new)
-                .orElse(null);
+    public ActualRoute getCurrentInProgressRoute(Long userId) {
+        List<ActualRoute> routes = actualRouteRepository
+                .findByUserIdAndStatusAndIsDeletedFalseOrderByActualRouteIdDesc(userId, "IN_PROGRESS");
+
+        if (routes.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "진행 중인 여행이 없습니다.");
+        }
+
+        // 가장 최근 것 하나만 툭 반환!
+        return routes.getFirst();
     }
 
     // 실제 여행으로 저장 (PlannedRoute -> ActualRoute 복사)
@@ -89,4 +96,6 @@ public class TripService {
                 })
                 .toList();
     }
+
+
 }
