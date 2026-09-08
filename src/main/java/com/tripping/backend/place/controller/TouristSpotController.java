@@ -65,4 +65,13 @@ public class TouristSpotController {
         TouristSpotResponse response = touristSpotService.createPlace(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
+
+    @GetMapping("/places/search")
+    @Operation(summary = "이름으로 장소 검색", description = "루트에 추가할 장소를 이름으로 검색")
+    public ResponseEntity<List<TouristSpotResponse>> searchByKeyword(
+            @RequestParam String query,
+            @RequestParam(required = false) String regionId
+    ) {
+        return ResponseEntity.ok(touristSpotService.searchByKeyword(query, regionId));
+    }
 }

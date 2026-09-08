@@ -76,6 +76,19 @@ public class TouristSpotService {
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 장소입니다. id=" + placeId));
     }
 
+    public List<TouristSpotResponse> searchByKeyword(String query, String regionId) {
+        List<TouristSpot> spots = (regionId != null && !regionId.isBlank())
+                ? touristSpotRepository.findByRegionIdAndNameContainingIgnoreCase(regionId, query)
+                : touristSpotRepository.findByNameContainingIgnoreCase(query);
+
+        return spots.stream()
+                .map(spot -> {
+                    SpotPingStatsResponse stats = pingService.getSpotPingStats(spot.getSpotId());
+                    return new TouristSpotResponse(spot, stats.popularTimeSlot(), stats.totalPingCount());
+                })
+                .toList();
+    }
+
     // 👈 새로 추가: 새 장소 등록 - POST /places
     // 네이버맵 POI 등 아직 우리 DB에 없는 장소를 클라이언트가 새로 등록할 때 씀
     // ⚠️ TouristSpot.builder() 구성은 SavedPlace 엔티티의 빌더 패턴을 보고 추측했습니다.
