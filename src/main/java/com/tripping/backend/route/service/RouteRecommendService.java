@@ -16,7 +16,7 @@ public class RouteRecommendService {
 
     private final PlaceTouristSpotRepository touristSpotRepository;
 
-    private static final int CANDIDATE_COUNT = 5;
+    private static final int CANDIDATE_COUNT = 4;
     private static final double WALK_SPEED_KM_PER_HOUR = 4.0;
 
     public List<RouteCandidateResponse> recommend(RouteRecommendRequest request) {
