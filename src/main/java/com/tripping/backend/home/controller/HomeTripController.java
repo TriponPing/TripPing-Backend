@@ -5,6 +5,7 @@ import com.tripping.backend.home.dto.response.PopularTripResponse;
 import com.tripping.backend.home.service.NearbyTripService;
 import com.tripping.backend.home.service.PopularTripService;
 import com.tripping.backend.mypage.dto.PageResponse;
+import com.tripping.backend.home.dto.response.TripDetailResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.PathVariable;
 
 /**
  * 클래스명이 trip 패키지의 TripController(실제 여행 전환 API, "/routes/{routeId}/trips")와
@@ -49,4 +51,13 @@ public class HomeTripController {
     ) {
         return ResponseEntity.ok(nearbyTripService.getNearbyTrips(lat, lng, radiusKm, page, size));
     }
+
+    @Operation(summary = "여행(루트) 상세 조회", description = "루트 하나를 상세 정보(방문경로, 작성자, 저장수 등)와 함께 조회합니다.")
+    @GetMapping("/{routeId}")
+    public ResponseEntity<TripDetailResponse> getTripDetail(
+            @PathVariable Long routeId
+    ) {
+        return ResponseEntity.ok(popularTripService.getTripDetail(routeId));
+    }
+
 }

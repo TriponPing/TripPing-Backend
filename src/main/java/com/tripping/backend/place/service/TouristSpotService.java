@@ -6,6 +6,13 @@ import com.tripping.backend.ping.service.PingService;
 import com.tripping.backend.place.dto.CreatePlaceRequest;
 import com.tripping.backend.place.dto.TouristSpotResponse;
 import com.tripping.backend.place.repository.PlaceTouristSpotRepository;
+import com.tripping.backend.entity.ActualRouteSpot;
+import com.tripping.backend.home.repository.HomeActualRouteSpotRepository;
+import com.tripping.backend.place.dto.SpotDetailResponse;
+import com.tripping.backend.place.dto.RegisteredRouteCardResponse;
+import com.tripping.backend.place.dto.SpotReviewResponse;
+import java.util.Map;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,6 +23,7 @@ import java.util.List;
 public class TouristSpotService {
 
     private final PlaceTouristSpotRepository touristSpotRepository;
+    private final HomeActualRouteSpotRepository actualRouteSpotRepository;
     private final PingService pingService;
 
     public List<TouristSpotResponse> searchByLocation(double lat, double lng, double radius) {
@@ -40,7 +48,8 @@ public class TouristSpotService {
         List<TouristSpot> spots;
 
         if (regionId != null && !regionId.isBlank()) {
-            spots = touristSpotRepository.findByCategoryAndRegionId(category, regionId);
+            // "동네핑거가 등록한" 화면이라, 장소 자체 지역이 아니라 "등록한 사람의 거주 지역+주민핑거 여부"로 필터링
+            spots = touristSpotRepository.findByCategoryAndCreatorRegionAndResidentPinger(category, regionId);
         } else {
             spots = touristSpotRepository.findByCategory(category);
         }
@@ -89,20 +98,105 @@ public class TouristSpotService {
                 .toList();
     }
 
+    public SpotDetailResponse getSpotDetail(Long spotId) {
+        TouristSpot spot = touristSpotRepository.findById(spotId)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 장소입니다. id=" + spotId));
+
+        SpotPingStatsResponse stats = pingService.getSpotPingStats(spotId);
+
+        List<Long> routeIds = actualRouteSpotRepository.findPublicRouteIdsBySpotId(spotId);
+        List<RegisteredRouteCardResponse> registeredRoutes = routeIds.stream()
+                .map(this::buildRouteCard)
+                .toList();
+
+        List<HomeActualRouteSpotRepository.SpotReviewProjection> reviewRows =
+                actualRouteSpotRepository.findReviewsBySpotId(spotId);
+        List<SpotReviewResponse> reviews = reviewRows.stream()
+                .map(r -> new SpotReviewResponse(r.getWriterNickname(), r.getRating(), r.getReviewComment()))
+                .toList();
+
+        return SpotDetailResponse.builder()
+                .spotId(spot.getSpotId())
+                .name(spot.getName())
+                .address(spot.getAddress())
+                .category(spot.getCategory())
+                .imageUrl(spot.getImageUrl())
+                .description(spot.getDescription())
+                .pingCount(stats.totalPingCount())
+                .popularTimeSlot(stats.popularTimeSlot())
+                .registeredRoutes(registeredRoutes)
+                .reviews(reviews)
+                .build();
+    }
+
+    private RegisteredRouteCardResponse buildRouteCard(Long routeId) {
+        List<ActualRouteSpot> spots = actualRouteSpotRepository.findByActualRouteIdOrderByVisitOrderAsc(routeId);
+        Map<Long, TouristSpot> spotById = touristSpotRepository
+                .findAllById(spots.stream().map(ActualRouteSpot::getSpotId).toList())
+                .stream()
+                .collect(Collectors.toMap(TouristSpot::getSpotId, s -> s));
+
+        List<TouristSpot> touristSpots = spots.stream()
+                .map(s -> spotById.get(s.getSpotId()))
+                .filter(s -> s != null)
+                .toList();
+
+        String theme = determineTheme(touristSpots);
+        String photoUrl = touristSpots.stream()
+                .map(TouristSpot::getImageUrl)
+                .filter(url -> url != null && !url.isBlank())
+                .findFirst()
+                .orElse(null);
+
+        return RegisteredRouteCardResponse.builder()
+                .actualRouteId(routeId)
+                .themeName(theme)
+                .photoUrl(photoUrl)
+                .placeCount(touristSpots.size())
+                .build();
+    }
+
+    // RouteRecommendService.determineTheme()랑 같은 로직 (카테고리 비율로 테마명 결정)
+    private String determineTheme(List<TouristSpot> spots) {
+        Map<String, Long> categoryCount = spots.stream()
+                .collect(Collectors.groupingBy(TouristSpot::getCategory, Collectors.counting()));
+
+        String topCategory = categoryCount.entrySet().stream()
+                .max(Map.Entry.comparingByValue())
+                .map(Map.Entry::getKey)
+                .orElse("");
+
+        long topCount = categoryCount.getOrDefault(topCategory, 0L);
+        boolean isEvenlyMixed = categoryCount.size() > 1 && topCount <= spots.size() / 2.0;
+
+        if (isEvenlyMixed) {
+            return "종합 나들이 루트";
+        }
+
+        return switch (topCategory) {
+            case "attraction" -> "역사탐방 루트";
+            case "restaurant" -> "맛집투어 루트";
+            case "cafe" -> "카페투어 루트";
+            default -> "종합 나들이 루트";
+        };
+    }
+
     // 👈 새로 추가: 새 장소 등록 - POST /places
     // 네이버맵 POI 등 아직 우리 DB에 없는 장소를 클라이언트가 새로 등록할 때 씀
     // ⚠️ TouristSpot.builder() 구성은 SavedPlace 엔티티의 빌더 패턴을 보고 추측했습니다.
     // 실제 TouristSpot 엔티티 파일 보여주시면 정확히 맞춰드릴게요.
     @Transactional
-    public TouristSpotResponse createPlace(CreatePlaceRequest request) {
+    public TouristSpotResponse createPlace(Long userId, CreatePlaceRequest request) {
         TouristSpot spot = TouristSpot.builder()
                 .name(request.name())
                 .category(request.category())
                 .latitude(request.latitude())
                 .longitude(request.longitude())
+                .createdByUserId(userId)
                 .build();
 
         TouristSpot saved = touristSpotRepository.save(spot);
         return new TouristSpotResponse(saved);
     }
+
 }

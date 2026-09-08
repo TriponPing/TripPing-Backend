@@ -25,6 +25,7 @@ public class TripService {
     private final PlannedRouteSpotRepository plannedRouteSpotRepository;
     private final TripActualRouteRepository actualRouteRepository;
     private final TripActualRouteSpotRepository actualRouteSpotRepository;
+    private final com.tripping.backend.home.repository.HomeSavedRouteRepository savedRouteRepository;
 
 
     // ⭐️ [추가] Ping 탭 등에서 현재 진행 중인 여행 정보를 조회하는 메서드
@@ -81,6 +82,21 @@ public class TripService {
         return routeIds.stream()
                 .map(routeId -> {
                     java.util.List<TripRouteMapPlaceResponse> places = actualRouteSpotRepository
+                            .findMapSpotsByActualRouteId(routeId)
+                            .stream()
+                            .map(TripRouteMapPlaceResponse::new)
+                            .toList();
+                    return new TripRouteMapSearchResponse(routeId, places);
+                })
+                .toList();
+    }
+
+    public List<TripRouteMapSearchResponse> getSavedRoutesForMap(Long userId) {
+        List<Long> routeIds = savedRouteRepository.findActualRouteIdsByUserId(userId);
+
+        return routeIds.stream()
+                .map(routeId -> {
+                    List<TripRouteMapPlaceResponse> places = actualRouteSpotRepository
                             .findMapSpotsByActualRouteId(routeId)
                             .stream()
                             .map(TripRouteMapPlaceResponse::new)

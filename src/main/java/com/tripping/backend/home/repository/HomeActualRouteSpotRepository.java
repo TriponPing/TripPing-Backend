@@ -96,4 +96,55 @@ public interface HomeActualRouteSpotRepository extends JpaRepository<ActualRoute
             @Param("radiusKm") double radiusKm,
             Pageable pageable
     );
+
+    @Query(value = """
+        SELECT COALESCE(AVG(pl.rating), 0)
+        FROM ping_log pl
+        JOIN actual_route_spot ars ON ars.actual_route_spot_id = pl.actual_route_spot_id
+        WHERE ars.spot_id = :spotId
+          AND pl.rating IS NOT NULL
+          AND pl.is_deleted = false
+        """, nativeQuery = true)
+    Double findAverageRatingBySpotId(@Param("spotId") Long spotId);
+
+    @Query(value = """
+        SELECT COUNT(DISTINCT ars.actual_route_id)
+        FROM actual_route_spot ars
+        WHERE ars.spot_id = :spotId
+        """, nativeQuery = true)
+    Long countDistinctRoutesBySpotId(@Param("spotId") Long spotId);
+
+    // 이 장소를 포함한 공개 루트들의 actual_route_id 목록
+    @Query(value = """
+        SELECT DISTINCT ar.actual_route_id
+        FROM actual_route_spot ars
+        JOIN actual_route ar ON ar.actual_route_id = ars.actual_route_id
+        WHERE ars.spot_id = :spotId
+          AND ar.is_public = true
+          AND ar.is_deleted = false
+        """, nativeQuery = true)
+    List<Long> findPublicRouteIdsBySpotId(@Param("spotId") Long spotId);
+
+    // 이 장소에 달린 후기(별점+텍스트) 목록. 작성자 닉네임까지 조인해서 가져옴
+    @Query(value = """
+        SELECT pl.rating AS rating,
+               pl.review_comment AS reviewComment,
+               u.nickname AS writerNickname
+        FROM ping_log pl
+        JOIN actual_route_spot ars ON ars.actual_route_spot_id = pl.actual_route_spot_id
+        JOIN actual_route ar ON ar.actual_route_id = ars.actual_route_id
+        JOIN app_user u ON u.user_id = ar.user_id
+        WHERE ars.spot_id = :spotId
+          AND pl.is_deleted = false
+          AND pl.review_comment IS NOT NULL
+        ORDER BY pl.created_at DESC
+        """, nativeQuery = true)
+    List<SpotReviewProjection> findReviewsBySpotId(@Param("spotId") Long spotId);
+
+    interface SpotReviewProjection {
+        Integer getRating();
+        String getReviewComment();
+        String getWriterNickname();
+    }
+
 }

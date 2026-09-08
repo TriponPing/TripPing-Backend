@@ -34,4 +34,7 @@ public interface HomeSavedRouteRepository extends JpaRepository<SavedRoute, Long
         WHERE sr.actualRouteId = :routeId AND sr.createdAt >= :since
         """)
     long countRecentSavesByRouteId(@Param("routeId") Long routeId, @Param("since") LocalDateTime since);
+
+    @Query("SELECT sr.actualRouteId FROM SavedRoute sr WHERE sr.userId = :userId")
+    List<Long> findActualRouteIdsByUserId(@Param("userId") Long userId);
 }
