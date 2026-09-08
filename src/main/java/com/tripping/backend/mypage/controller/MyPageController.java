@@ -4,6 +4,7 @@ import com.tripping.backend.auth.service.CustomUserDetails;
 import com.tripping.backend.mypage.dto.*;
 import com.tripping.backend.mypage.service.MyPageBadgeService;
 import com.tripping.backend.mypage.service.MyPageMapService;
+import com.tripping.backend.mypage.service.MyPagePlaceService;
 import com.tripping.backend.mypage.service.MyPageProfileService;
 import com.tripping.backend.mypage.service.MyPageRouteService;
 import com.tripping.backend.mypage.service.MyPageTripService;
@@ -32,6 +33,7 @@ public class MyPageController {
     private final MyPageRouteService routeService;
     private final MyPageMapService mapService;
     private final MyPageBadgeService badgeService;
+    private final MyPagePlaceService placeService;
 
     @Operation(summary = "프로필 조회", description = "로그인한 유저의 프로필 정보를 조회합니다.")
     @GetMapping
@@ -95,6 +97,18 @@ public class MyPageController {
         return ResponseEntity.ok(routeService.getSavedRoutes(userDetails.getUserId(), pageable));
     }
 
+    @Operation(summary = "저장한 장소 목록 조회", description = "북마크(찜)한 단일 장소 목록을 페이징으로 조회합니다.")
+    @GetMapping("/places/saved")
+    public ResponseEntity<PageResponse<SavedPlaceCardResponse>> getSavedPlaces(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) {
+        requireLogin(userDetails);
+        Pageable pageable = PageRequest.of(page, size);
+        return ResponseEntity.ok(placeService.getSavedPlaces(userDetails.getUserId(), pageable));
+    }
+
     @Operation(summary = "나의 여행 지도 조회", description = "다녀온 여행 + 저장한 루트를 지도에 찍을 핀 목록(대표 좌표)과, 다녀온 장소 개수(저장한 루트 제외, 중복 제거)를 조회합니다.")
     @GetMapping("/map")
     public ResponseEntity<MyMapResponse> getMyMap(
@@ -104,15 +118,16 @@ public class MyPageController {
         return ResponseEntity.ok(mapService.getMyMap(userDetails.getUserId()));
     }
 
-    @Operation(summary = "나의 여행 지도 상세 조회", description = "type=drawn(내가 다녀온 여행) / saved(저장한 루트) / planned(내 계획, 아직 시작 안 한 것)별로 전체 경로를 조회합니다.")
+    @Operation(summary = "나의 여행 지도 상세 조회", description = "type=drawn(내가 다녀온 여행) / saved(저장한 루트) / planned(내 계획, 아직 시작 안 한 것) / places(저장한 장소)별로 전체 경로(장소는 핀)를 조회합니다.")
     @GetMapping("/map/detail")
     public ResponseEntity<List<MapDetailResponse>> getMyMapDetail(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @RequestParam String type
     ) {
         requireLogin(userDetails);
-        if (!"drawn".equalsIgnoreCase(type) && !"saved".equalsIgnoreCase(type) && !"planned".equalsIgnoreCase(type)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "type은 drawn, saved, planned만 가능합니다.");
+        if (!"drawn".equalsIgnoreCase(type) && !"saved".equalsIgnoreCase(type)
+                && !"planned".equalsIgnoreCase(type) && !"places".equalsIgnoreCase(type)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "type은 drawn, saved, planned, places만 가능합니다.");
         }
         return ResponseEntity.ok(mapService.getMyMapDetail(userDetails.getUserId(), type));
     }

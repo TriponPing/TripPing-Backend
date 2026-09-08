@@ -1,19 +1,27 @@
 package com.tripping.backend.ping.service;
 
 import com.tripping.backend.entity.ActualRoute;
+import com.tripping.backend.entity.ActualRouteSpot;
+import com.tripping.backend.entity.RouteStatus;
+import com.tripping.backend.entity.TouristSpot;
 import com.tripping.backend.entity.WidgetPing;
+import com.tripping.backend.ping.dto.AddTripSpotRequest;
+import com.tripping.backend.ping.dto.AddTripSpotResponse;
 import com.tripping.backend.ping.dto.OngoingTripResponse;
 import com.tripping.backend.ping.dto.PingRegisterRequest;
 import com.tripping.backend.ping.dto.PingResponse;
+import com.tripping.backend.ping.dto.SpotPingStatsResponse;
 import com.tripping.backend.ping.repository.PingActualRouteRepository;
+import com.tripping.backend.ping.repository.PingActualRouteSpotRepository;
+import com.tripping.backend.ping.repository.PingTouristSpotRepository;
 import com.tripping.backend.ping.repository.WidgetPingRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
-import com.tripping.backend.ping.dto.SpotPingStatsResponse;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -22,15 +30,19 @@ import java.util.List;
 public class PingService {
 
     private final PingActualRouteRepository actualRouteRepository;
+    private final PingActualRouteSpotRepository actualRouteSpotRepository;
+    private final PingTouristSpotRepository touristSpotRepository;
     private final WidgetPingRepository widgetPingRepository;
 
     // 방문 장소 Ping 등록 - POST /routes/{routeId}/pings
-    // 👈 RouteStatus는 IN_PROGRESS/COMPLETED 둘뿐이라 상태별 화이트리스트는 사실상 의미가 없음.
-    // "다녀온(완료) 여행"에도 핑 추가를 허용해야 하므로 상태 제약은 두지 않음.
-    // 여행 자체가 존재하고 본인 소유인지(findOwnedRoute)만 검증하면 충분함.
+    // 👈 진행 중(IN_PROGRESS)인 여행 전용 - 완료된 여행에 놓친 장소를 추가하려면
+    // POST /trips/{routeId}/spots (addSpotToTrip)를 대신 쓸 것
     @Transactional
     public PingResponse registerPing(Long userId, Long routeId, PingRegisterRequest request) {
         ActualRoute route = findOwnedRoute(userId, routeId);
+        if (route.getStatus() != RouteStatus.IN_PROGRESS) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "진행 중인 여행에만 핑을 등록할 수 있습니다.");
+        }
 
         WidgetPing ping = WidgetPing.builder()
                 .actualRouteId(routeId)
@@ -66,6 +78,45 @@ public class PingService {
                 .findByActualRouteIdAndIsDeletedFalseOrderByPingTimeAsc(routeId).stream()
                 .map(PingResponse::from)
                 .toList();
+    }
+
+    // 👈 새로 추가: 완료된 여행에 놓친 방문 스팟을 나중에 추가 - POST /trips/{routeId}/spots
+    // WIDGET_PING이 아니라 ACTUAL_ROUTE_SPOT에 직접 저장함 (이미 끝난 여행이라 "확정된 방문 기록"이므로).
+    // ⚠️ ActualRouteSpot.builder() 구성은 다른 엔티티 빌더 패턴을 보고 추측했습니다.
+    // 실제 엔티티 파일과 다르면 알려주세요.
+    @Transactional
+    public AddTripSpotResponse addSpotToTrip(Long userId, Long routeId, AddTripSpotRequest request) {
+        findOwnedRoute(userId, routeId); // 소유권 검증
+
+        List<ActualRouteSpot> existingSpots = actualRouteSpotRepository
+                .findByActualRouteIdOrderByVisitOrderAsc(routeId);
+        int nextVisitOrder = existingSpots.stream()
+                .mapToInt(ActualRouteSpot::getVisitOrder)
+                .max()
+                .orElse(0) + 1;
+
+        ActualRouteSpot spot = ActualRouteSpot.builder()
+                .actualRouteId(routeId)
+                .spotId(request.spotId())
+                .latitude(request.latitude())
+                .longitude(request.longitude())
+                .visitOrder(nextVisitOrder)
+                .visitTime(LocalDateTime.now())
+                .build();
+
+        ActualRouteSpot saved = actualRouteSpotRepository.save(spot);
+        TouristSpot ts = touristSpotRepository.findById(request.spotId()).orElse(null);
+
+        return new AddTripSpotResponse(
+                saved.getVisitOrder(),
+                saved.getSpotId(),
+                ts != null ? ts.getName() : null,
+                ts != null ? ts.getCategory() : null,
+                ts != null ? ts.getAddress() : null,
+                ts != null ? ts.getLatitude() : null,
+                ts != null ? ts.getLongitude() : null,
+                saved.getVisitTime()
+        );
     }
 
     private ActualRoute findOwnedRoute(Long userId, Long routeId) {

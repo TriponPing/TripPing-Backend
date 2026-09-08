@@ -3,6 +3,8 @@ package com.tripping.backend.place.controller;
 import com.tripping.backend.auth.service.CustomUserDetails;
 import com.tripping.backend.place.dto.SavedPlaceResponse;
 import com.tripping.backend.place.service.SavedPlaceService;
+import com.tripping.backend.place.dto.TouristSpotResponse;
+import java.util.List;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +27,14 @@ public class SavedPlaceController {
             @PathVariable Long placeId
     ) {
         return ResponseEntity.ok(savedPlaceService.savePlace(userDetails.getUserId(), placeId));
+    }
+
+    @GetMapping("/saved/me")
+    @Operation(summary = "내가 저장한 장소 목록 조회")
+    public ResponseEntity<List<TouristSpotResponse>> getSavedPlaces(
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        return ResponseEntity.ok(savedPlaceService.getSavedPlaces(userDetails.getUserId()));
     }
 
     @DeleteMapping("/{placeId}/saved/me")
