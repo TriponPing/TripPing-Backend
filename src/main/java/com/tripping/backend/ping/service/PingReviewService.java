@@ -102,6 +102,7 @@ public class PingReviewService {
                 log.getRating(),
                 log.getPhotoUrl(),
                 log.getReviewComment(),
+                java.util.List.of(),
                 log.getUpdatedAt()
         );
     }
