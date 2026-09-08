@@ -3,6 +3,7 @@ package com.tripping.backend.ping.dto;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Size;
+import java.util.List;
 
 /**
  * Ping 후기 등록/수정 요청
@@ -18,6 +19,8 @@ public record PingReviewRequest(
         String photoUrl,
 
         @Size(max = 2000, message = "후기는 2000자를 넘을 수 없습니다.")
-        String reviewComment
+        String reviewComment, // 💡 여기에 콤마(,)가 있어야 다음 필드로 넘어갈 수 있어!
+
+        List<String> tags
 ) {
 }

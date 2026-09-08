@@ -1,6 +1,7 @@
 package com.tripping.backend.ping.dto;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * Ping 후기 응답
@@ -16,6 +17,7 @@ public record PingReviewResponse(
         Integer rating,
         String photoUrl,
         String reviewComment,
+        List<String> tags, // 저장된 태그 목록 추가
         LocalDateTime updatedAt
 ) {
 }
