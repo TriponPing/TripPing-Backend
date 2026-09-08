@@ -27,4 +27,6 @@ public interface TripActualRouteRepository extends JpaRepository<ActualRoute, Lo
         """, nativeQuery = true)
     List<Long> findMatchingRouteIds(@Param("regionId") String regionId,
                                     @Param("category") String category);
+
+    List<ActualRoute> findByUserIdAndStatusAndIsDeletedFalseOrderByActualRouteIdDesc(Long userId, String inProgress);
 }

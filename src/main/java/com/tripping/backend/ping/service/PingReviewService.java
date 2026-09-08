@@ -3,16 +3,22 @@ package com.tripping.backend.ping.service;
 import com.tripping.backend.entity.ActualRoute;
 import com.tripping.backend.entity.ActualRouteSpot;
 import com.tripping.backend.entity.PingLog;
+import com.tripping.backend.entity.PingLogTag;
+import com.tripping.backend.entity.Tag;
 import com.tripping.backend.ping.dto.PingReviewRequest;
 import com.tripping.backend.ping.dto.PingReviewResponse;
 import com.tripping.backend.ping.repository.PingActualRouteRepository;
 import com.tripping.backend.ping.repository.PingActualRouteSpotRepository;
 import com.tripping.backend.ping.repository.PingLogRepository;
+import com.tripping.backend.ping.repository.PingLogTagRepository;
+import com.tripping.backend.ping.repository.TagRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+
+import java.util.List;
 
 /**
  * Ping 후기(PING_LOG) CRUD.
@@ -27,6 +33,8 @@ public class PingReviewService {
     private final PingActualRouteSpotRepository actualRouteSpotRepository;
     private final PingActualRouteRepository actualRouteRepository;
     private final PingLogRepository pingLogRepository;
+    private final TagRepository tagRepository;
+    private final PingLogTagRepository pingLogTagRepository;
 
     // Ping 후기 등록 - POST /pings/{pingId}/review
     @Transactional
@@ -46,8 +54,12 @@ public class PingReviewService {
                 .photoUrl(request.photoUrl())
                 .reviewComment(request.reviewComment())
                 .build();
+        PingLog savedLog = pingLogRepository.save(log);
 
-        return toResponse(pingId, pingLogRepository.save(log));
+        // ⭐ 태그 저장 및 연결
+        saveTagsForLog(savedLog, request.tags());
+
+        return toResponse(pingId, savedLog);
     }
 
     // Ping 후기 수정 - PATCH /pings/{pingId}/review (null 필드는 그대로 둠)
@@ -64,6 +76,12 @@ public class PingReviewService {
         }
         if (request.reviewComment() != null) {
             log.setReviewComment(request.reviewComment());
+        }
+
+        // ⭐ 태그 수정 (요청에 태그가 포함되어 있다면 기존 연결을 끊고 새로 교체)
+        if (request.tags() != null) {
+            pingLogTagRepository.deleteByPingLog(log);
+            saveTagsForLog(log, request.tags());
         }
 
         return toResponse(pingId, log);
@@ -96,13 +114,36 @@ public class PingReviewService {
         return spot;
     }
 
+    // 태그를 DB에 찾거나 생성한 뒤, PingLogTag 매핑 테이블에 저장하는 헬퍼 메서드
+    private void saveTagsForLog(PingLog pingLog, List<String> tagNames) {
+        if (tagNames == null || tagNames.isEmpty()) {
+            return;
+        }
+        for (String tagName : tagNames) {
+            if (tagName == null || tagName.isBlank()) continue;
+            Tag tag = tagRepository.findByName(tagName)
+                    .orElseGet(() -> tagRepository.save(Tag.builder().name(tagName).build()));
+
+            PingLogTag pingLogTag = PingLogTag.builder()
+                    .pingLog(pingLog)
+                    .tag(tag)
+                    .build();
+            pingLogTagRepository.save(pingLogTag);
+        }
+    }
+
     private PingReviewResponse toResponse(Long pingId, PingLog log) {
+        // 연결된 태그 목록을 조회해서 리스트로 변환
+        List<String> tags = pingLogTagRepository.findByPingLog(log).stream()
+                .map(pingLogTag -> pingLogTag.getTag().getName())
+                .toList();
+
         return new PingReviewResponse(
                 pingId,
                 log.getRating(),
                 log.getPhotoUrl(),
                 log.getReviewComment(),
-                java.util.List.of(),
+                tags,
                 log.getUpdatedAt()
         );
     }
