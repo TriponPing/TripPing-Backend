@@ -118,15 +118,16 @@ public class MyPageController {
         return ResponseEntity.ok(mapService.getMyMap(userDetails.getUserId()));
     }
 
-    @Operation(summary = "나의 여행 지도 상세 조회", description = "type=drawn(내가 다녀온 여행) / saved(저장한 루트) / planned(내 계획, 아직 시작 안 한 것)별로 전체 경로를 조회합니다.")
+    @Operation(summary = "나의 여행 지도 상세 조회", description = "type=drawn(내가 다녀온 여행) / saved(저장한 루트) / planned(내 계획, 아직 시작 안 한 것) / places(저장한 장소)별로 전체 경로(장소는 핀)를 조회합니다.")
     @GetMapping("/map/detail")
     public ResponseEntity<List<MapDetailResponse>> getMyMapDetail(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @RequestParam String type
     ) {
         requireLogin(userDetails);
-        if (!"drawn".equalsIgnoreCase(type) && !"saved".equalsIgnoreCase(type) && !"planned".equalsIgnoreCase(type)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "type은 drawn, saved, planned만 가능합니다.");
+        if (!"drawn".equalsIgnoreCase(type) && !"saved".equalsIgnoreCase(type)
+                && !"planned".equalsIgnoreCase(type) && !"places".equalsIgnoreCase(type)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "type은 drawn, saved, planned, places만 가능합니다.");
         }
         return ResponseEntity.ok(mapService.getMyMapDetail(userDetails.getUserId(), type));
     }
