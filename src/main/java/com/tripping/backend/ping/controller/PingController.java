@@ -1,6 +1,8 @@
 package com.tripping.backend.ping.controller;
 
 import com.tripping.backend.auth.service.CustomUserDetails;
+import com.tripping.backend.ping.dto.AddTripSpotRequest;
+import com.tripping.backend.ping.dto.AddTripSpotResponse;
 import com.tripping.backend.ping.dto.OngoingTripResponse;
 import com.tripping.backend.ping.dto.PingRegisterRequest;
 import com.tripping.backend.ping.dto.PingResponse;
@@ -55,6 +57,19 @@ public class PingController {
     ) {
         requireLogin(userDetails);
         return ResponseEntity.ok(pingService.getTripPings(userDetails.getUserId(), routeId));
+    }
+
+    // 👈 새로 추가: 완료된 여행에 놓친 방문 스팟 추가
+    @Operation(summary = "여행에 방문 스팟 추가", description = "완료된 여행에 나중에 빠뜨린 방문 장소를 추가합니다. (ACTUAL_ROUTE_SPOT에 바로 저장)")
+    @PostMapping("/trips/{routeId}/spots")
+    public ResponseEntity<AddTripSpotResponse> addTripSpot(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long routeId,
+            @Valid @RequestBody AddTripSpotRequest request
+    ) {
+        requireLogin(userDetails);
+        AddTripSpotResponse response = pingService.addSpotToTrip(userDetails.getUserId(), routeId, request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     private void requireLogin(CustomUserDetails userDetails) {
