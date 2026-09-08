@@ -27,6 +27,7 @@ public class TripService {
     private final PlannedRouteSpotRepository plannedRouteSpotRepository;
     private final TripActualRouteRepository actualRouteRepository;
     private final TripActualRouteSpotRepository actualRouteSpotRepository;
+    private final com.tripping.backend.home.repository.HomeSavedRouteRepository savedRouteRepository;
 
 
     public ActualRoute getCurrentInProgressRoute(Long userId) {
@@ -97,5 +98,18 @@ public class TripService {
                 .toList();
     }
 
+    public List<TripRouteMapSearchResponse> getSavedRoutesForMap(Long userId) {
+        List<Long> routeIds = savedRouteRepository.findActualRouteIdsByUserId(userId);
 
+        return routeIds.stream()
+                .map(routeId -> {
+                    List<TripRouteMapPlaceResponse> places = actualRouteSpotRepository
+                            .findMapSpotsByActualRouteId(routeId)
+                            .stream()
+                            .map(TripRouteMapPlaceResponse::new)
+                            .toList();
+                    return new TripRouteMapSearchResponse(routeId, places);
+                })
+                .toList();
+    }
 }

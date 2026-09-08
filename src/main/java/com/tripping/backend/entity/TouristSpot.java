@@ -50,4 +50,7 @@ public class TouristSpot {
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
     }
+
+    @Column(name = "created_by_user_id")
+    private Long createdByUserId; // 이 장소를 등록한 유저. NULL이면 등록자 없음(공공데이터 등)
 }

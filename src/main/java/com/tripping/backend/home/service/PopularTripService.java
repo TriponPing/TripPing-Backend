@@ -11,6 +11,8 @@ import com.tripping.backend.home.repository.HomeActualRouteRepository;
 import com.tripping.backend.home.repository.HomeActualRouteSpotRepository;
 import com.tripping.backend.home.repository.HomeSavedRouteRepository;
 import com.tripping.backend.home.repository.HomeTouristSpotRepository;
+import com.tripping.backend.home.dto.response.TripDetailResponse;
+import com.tripping.backend.home.dto.response.StopSummaryResponse;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -105,5 +107,64 @@ public class PopularTripService {
         return userRepository.findById(userId)
                 .map(AppUser::getNickname)
                 .orElse(UNKNOWN_NICKNAME);
+    }
+
+    public TripDetailResponse getTripDetail(Long routeId) {
+        ActualRoute route = actualRouteRepository.findById(routeId)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 루트입니다. id=" + routeId));
+
+        List<ActualRouteSpot> spots = actualRouteSpotRepository
+                .findByActualRouteIdOrderByVisitOrderAsc(routeId);
+        Map<Long, TouristSpot> spotById = touristSpotRepository
+                .findAllById(spots.stream().map(ActualRouteSpot::getSpotId).toList())
+                .stream()
+                .collect(java.util.stream.Collectors.toMap(TouristSpot::getSpotId, s -> s));
+
+        // 방문 순서대로 각 장소의 평균 별점 + 등록된 루트 수까지 같이 계산
+        List<StopSummaryResponse> stops = spots.stream()
+                .map(s -> spotById.get(s.getSpotId()))
+                .filter(s -> s != null)
+                .map(spot -> StopSummaryResponse.builder()
+                        .spotId(spot.getSpotId())
+                        .name(spot.getName())
+                        .averageRating(actualRouteSpotRepository.findAverageRatingBySpotId(spot.getSpotId()))
+                        .registeredRouteCount(actualRouteSpotRepository.countDistinctRoutesBySpotId(spot.getSpotId()))
+                        .build())
+                .toList();
+
+        String photoUrl = spots.stream()
+                .map(s -> spotById.get(s.getSpotId()))
+                .filter(s -> s != null)
+                .map(TouristSpot::getImageUrl)
+                .filter(url -> url != null && !url.isBlank())
+                .findFirst()
+                .orElse(null);
+
+        List<CoordinateResponse> coordinates = spots.stream()
+                .filter(s -> s.getLatitude() != null && s.getLongitude() != null)
+                .map(s -> CoordinateResponse.builder()
+                        .latitude(s.getLatitude().doubleValue())
+                        .longitude(s.getLongitude().doubleValue())
+                        .build())
+                .toList();
+
+        AppUser writer = userRepository.findById(route.getUserId()).orElse(null);
+
+        // ⚠️ 전체 기간 저장 수 세는 메서드가 따로 없어서, 기존 "최근 N일" 메서드를
+        // 넓은 기간(100년 전부터)으로 부르는 편법이에요. 진짜 전체 카운트 메서드 있으면 교체해주세요.
+        LocalDateTime since = LocalDateTime.now().minusYears(100);
+        long savedCount = savedRouteRepository.countRecentSavesByRouteId(routeId, since);
+
+        return TripDetailResponse.builder()
+                .routeId(route.getActualRouteId())
+                .writerNickname(writer != null ? writer.getNickname() : UNKNOWN_NICKNAME)
+                .writerProfileImage(writer != null ? writer.getProfileImage() : null)
+                .writerLevel(writer != null && writer.getLevel() != null ? writer.getLevel().name() : null)
+                .stops(stops)
+                .placeCount(stops.size())
+                .photoUrl(photoUrl)
+                .savedCount(savedCount)
+                .coordinates(coordinates)
+                .build();
     }
 }

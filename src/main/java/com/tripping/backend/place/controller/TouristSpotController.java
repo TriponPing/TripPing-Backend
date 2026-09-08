@@ -3,6 +3,9 @@ package com.tripping.backend.place.controller;
 import com.tripping.backend.place.dto.CreatePlaceRequest;
 import com.tripping.backend.place.dto.TouristSpotResponse;
 import com.tripping.backend.place.service.TouristSpotService;
+import com.tripping.backend.place.dto.SpotDetailResponse;
+import com.tripping.backend.auth.service.CustomUserDetails;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -61,8 +64,11 @@ public class TouristSpotController {
     // 새로 추가: 새 장소 등록 - POST /places
     @PostMapping("/places")
     @Operation(summary = "새 장소 등록", description = "네이버맵 등에서 발견한, 아직 우리 DB에 없는 장소를 새로 등록합니다.")
-    public ResponseEntity<TouristSpotResponse> createPlace(@Valid @RequestBody CreatePlaceRequest request) {
-        TouristSpotResponse response = touristSpotService.createPlace(request);
+    public ResponseEntity<TouristSpotResponse> createPlace(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @Valid @RequestBody CreatePlaceRequest request
+    ) {
+        TouristSpotResponse response = touristSpotService.createPlace(userDetails.getUserId(), request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -74,4 +80,13 @@ public class TouristSpotController {
     ) {
         return ResponseEntity.ok(touristSpotService.searchByKeyword(query, regionId));
     }
+
+    @GetMapping("/places/{placeId}/detail")
+    @Operation(summary = "장소 상세 조회", description = "통계(핑수/인기시간대), 장소 설명, 등록된 루트, 후기 포함")
+    public ResponseEntity<SpotDetailResponse> getSpotDetail(
+            @PathVariable Long placeId
+    ) {
+        return ResponseEntity.ok(touristSpotService.getSpotDetail(placeId));
+    }
+
 }

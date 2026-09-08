@@ -5,6 +5,8 @@ import com.tripping.backend.entity.ActualRoute;
 import com.tripping.backend.trip.dto.TripCreateRequest;
 import com.tripping.backend.trip.dto.TripResponse;
 import com.tripping.backend.trip.dto.TripRouteMapSearchResponse;
+import com.tripping.backend.auth.service.CustomUserDetails;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import com.tripping.backend.trip.service.TripService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -12,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import java.util.List;
 
 @RestController
 @RequestMapping("/routes")
@@ -54,5 +57,13 @@ public class TripController {
             return ResponseEntity.noContent().build(); // 진행 중인 여행이 없으면 204 No Content
         }
         return ResponseEntity.ok(response); // 있으면 200 OK + 데이터
+    }
+
+    @Operation(summary = "내가 저장한 루트 지도 조회")
+    @GetMapping("/saved/map")
+    public ResponseEntity<List<TripRouteMapSearchResponse>> getMySavedRoutesForMap(
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        return ResponseEntity.ok(tripService.getSavedRoutesForMap(userDetails.getUserId()));
     }
 }
