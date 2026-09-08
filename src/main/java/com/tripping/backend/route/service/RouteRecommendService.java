@@ -48,7 +48,7 @@ public class RouteRecommendService {
             }
         }
 
-        // 4. 서로 다른 시작점 5개 선정 (섞은 뒤 앞에서부터 선택)
+        // 4. 서로 다른 시작점 4개 선정 (섞은 뒤 앞에서부터 선택)
         List<TouristSpot> shuffled = new ArrayList<>(candidates);
         Collections.shuffle(shuffled);
         int startCount = Math.min(CANDIDATE_COUNT, shuffled.size());
