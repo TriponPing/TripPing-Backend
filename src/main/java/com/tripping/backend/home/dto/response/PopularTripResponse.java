@@ -9,7 +9,7 @@ import lombok.Builder;
 import lombok.Getter;
 
 @Getter
-@Builder
+@Builder(toBuilder = true)
 @Schema(description = "이번주 인기 여행 응답")
 public class PopularTripResponse {
 
@@ -48,6 +48,10 @@ public class PopularTripResponse {
 
     @Schema(description = "실제 GPS 핑이 찍힌 방문 순서대로의 좌표 목록 (핑이 없는 스팟은 제외, 지도/경로 표시용)")
     private List<CoordinateResponse> coordinates;
+
+    @Schema(description = "이 루트의 후기에 달린 해시태그 목록 (키워드로 루트 조회 시에만 채워짐, 그 외엔 빈 목록)")
+    @Builder.Default
+    private List<String> tags = List.of();
 
     public static PopularTripResponse from(
             ActualRoute route,
