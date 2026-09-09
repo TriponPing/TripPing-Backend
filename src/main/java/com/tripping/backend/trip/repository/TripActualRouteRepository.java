@@ -1,18 +1,20 @@
 package com.tripping.backend.trip.repository;
 
 import com.tripping.backend.entity.ActualRoute;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import org.springframework.data.domain.Pageable;
+
 import java.util.List;
-import java.util.Optional; // ⭐️ 임포트 추가
 
 public interface TripActualRouteRepository extends JpaRepository<ActualRoute, Long> {
 
-    // ⭐️ [추가] 유저의 진행 중(IN_PROGRESS)인 최신 여행 조회
+    // 유저의 진행 중(IN_PROGRESS)인 여행 조회. 정상적으로는 1개여야 하지만 혹시 2개 이상
+    // 남아있어도 Pageable로 원하는 개수만 안전하게 가져올 수 있음(Optional 단건 조회 X).
     @Query("SELECT r FROM ActualRoute r WHERE r.userId = :userId AND r.status = 'IN_PROGRESS' AND r.isDeleted = false ORDER BY r.actualRouteId DESC")
     List<ActualRoute> findInProgressRoutes(@Param("userId") Long userId, Pageable pageable);
+
     // 지도용 루트 검색: 공개(isPublic) + 삭제안됨(isDeleted=false) + 지역/카테고리 조건에 맞는 루트 id 목록
     @Query(value = """
         SELECT DISTINCT ar.actual_route_id
@@ -26,6 +28,4 @@ public interface TripActualRouteRepository extends JpaRepository<ActualRoute, Lo
         """, nativeQuery = true)
     List<Long> findMatchingRouteIds(@Param("regionId") String regionId,
                                     @Param("category") String category);
-
-    List<ActualRoute> findByUserIdAndStatusAndIsDeletedFalseOrderByActualRouteIdDesc(Long userId, String inProgress);
 }

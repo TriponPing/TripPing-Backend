@@ -15,6 +15,8 @@ import com.tripping.backend.trip.repository.TripActualRouteRepository;
 import com.tripping.backend.trip.repository.TripActualRouteSpotRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -46,6 +48,15 @@ public class TripService {
 
         if (!plannedRoute.getUserId().equals(userId)) {
             throw new IllegalArgumentException("본인의 루트만 여행으로 전환할 수 있습니다.");
+        }
+
+        // 1-1. 이미 진행 중인 여행이 있으면 새로 시작 못 하게 막음 - 유저당 IN_PROGRESS는 항상 1개여야
+        // 홈 화면 "진행 중인 여행" 조회 등에서 어느 걸 보여줘야 할지 애매해지는 걸 방지함.
+        boolean hasInProgressTrip = !actualRouteRepository
+                .findInProgressRoutes(userId, PageRequest.of(0, 1))
+                .isEmpty();
+        if (hasInProgressTrip) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 진행 중인 여행이 있습니다. 먼저 완료 처리해주세요.");
         }
 
         // 2. ActualRoute 새로 생성 (복사)
