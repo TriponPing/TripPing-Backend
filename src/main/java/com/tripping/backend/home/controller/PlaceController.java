@@ -44,7 +44,7 @@ public class PlaceController {
     }
 
     @Operation(summary = "내가 저장한 장소 id 목록 조회", description = "북마크(저장)한 장소의 spotId 목록을 조회합니다. 화면 진입 시 북마크 초기 상태 복원용.")
-    @GetMapping("/saved/me")
+    @GetMapping("/saved/me/ids")
     public ResponseEntity<List<Long>> getMySavedPlaceIds(
             @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
