@@ -14,10 +14,10 @@ import com.tripping.backend.trip.dto.TripRouteMapSearchResponse;
 import com.tripping.backend.trip.repository.TripActualRouteRepository;
 import com.tripping.backend.trip.repository.TripActualRouteSpotRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+
 import java.util.List;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 @RequiredArgsConstructor
@@ -29,17 +29,13 @@ public class TripService {
     private final TripActualRouteSpotRepository actualRouteSpotRepository;
     private final com.tripping.backend.home.repository.HomeSavedRouteRepository savedRouteRepository;
 
-
-    public ActualRoute getCurrentInProgressRoute(Long userId) {
+    // ⭐️ [수정] 유저에게 진행중(IN_PROGRESS)인 여행이 실수로 2개 이상 남아있어도
+    // 에러 안 나게 Pageable로 딱 1개만(가장 최근 것) 가져오도록 변경
+    public CurrentTripResponse getCurrentInProgressRoute(Long userId) {
         List<ActualRoute> routes = actualRouteRepository
-                .findByUserIdAndStatusAndIsDeletedFalseOrderByActualRouteIdDesc(userId, "IN_PROGRESS");
+                .findInProgressRoutes(userId, PageRequest.of(0, 1));
 
-        if (routes.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "진행 중인 여행이 없습니다.");
-        }
-
-        // 가장 최근 것 하나만 툭 반환!
-        return routes.getFirst();
+        return routes.isEmpty() ? null : new CurrentTripResponse(routes.get(0));
     }
 
     // 실제 여행으로 저장 (PlannedRoute -> ActualRoute 복사)
