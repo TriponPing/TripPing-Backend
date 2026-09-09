@@ -1,7 +1,9 @@
 package com.tripping.backend.mypage.service;
 
+import com.tripping.backend.auth.repository.UserRepository;
 import com.tripping.backend.entity.ActualRoute;
 import com.tripping.backend.entity.ActualRouteSpot;
+import com.tripping.backend.entity.AppUser;
 import com.tripping.backend.entity.SavedRoute;
 import com.tripping.backend.mypage.dto.PageResponse;
 import com.tripping.backend.mypage.dto.SavedRouteResponse;
@@ -26,10 +28,13 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class MyPageRouteService {
 
+    private static final String UNKNOWN_NICKNAME = "알 수 없음";
+
     private final MyPageSavedRouteRepository savedRouteRepository;
     private final MyPageActualRouteRepository actualRouteRepository;
     private final MyPageActualRouteSpotRepository actualRouteSpotRepository;
     private final RepresentativeSpotFinder representativeSpotFinder;
+    private final UserRepository userRepository;
 
     // 저장한 루트 목록 조회 - GET /users/me/routes/saved
     public PageResponse<SavedRouteResponse> getSavedRoutes(Long userId, Pageable pageable) {
@@ -52,6 +57,13 @@ public class MyPageRouteService {
                         .findByActualRouteIdInOrderByActualRouteIdAscVisitOrderAsc(routeIds).stream()
                         .collect(Collectors.groupingBy(ActualRouteSpot::getActualRouteId, Collectors.counting()));
 
+        // 루트를 만든(다녀온) 계정의 닉네임 - 카드 제목으로 표시. 유저 id도 한 번에 모아서 N+1 방지
+        List<Long> writerIds = routeById.values().stream().map(ActualRoute::getUserId).distinct().toList();
+        Map<Long, String> nicknameByUserId = writerIds.isEmpty()
+                ? Map.of()
+                : userRepository.findAllById(writerIds).stream()
+                        .collect(Collectors.toMap(AppUser::getUserId, AppUser::getNickname));
+
         List<SavedRouteResponse> content = page.getContent().stream()
                 .map(sr -> {
                     ActualRoute route = routeById.get(sr.getActualRouteId());
@@ -62,6 +74,7 @@ public class MyPageRouteService {
                             sr.getActualRouteId(),
                             route != null ? route.getTravelDate() : null,
                             route != null ? route.getMemberCount() : null,
+                            route != null ? nicknameByUserId.getOrDefault(route.getUserId(), UNKNOWN_NICKNAME) : UNKNOWN_NICKNAME,
                             rep != null ? rep.spotName() : null,
                             rep != null ? rep.imageUrl() : null,
                             placeCount != null ? placeCount.intValue() : 0,
