@@ -9,14 +9,17 @@ import com.tripping.backend.home.dto.response.CoordinateResponse;
 import com.tripping.backend.home.dto.response.PopularTripResponse;
 import com.tripping.backend.home.repository.HomeActualRouteRepository;
 import com.tripping.backend.home.repository.HomeActualRouteSpotRepository;
+import com.tripping.backend.home.repository.HomePingLogTagRepository;
 import com.tripping.backend.home.repository.HomeSavedRouteRepository;
 import com.tripping.backend.home.repository.HomeTouristSpotRepository;
+import com.tripping.backend.home.repository.RouteTagProjection;
 import com.tripping.backend.home.dto.response.TripDetailResponse;
 import com.tripping.backend.home.dto.response.StopSummaryResponse;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -37,6 +40,7 @@ public class PopularTripService {
     private final HomeActualRouteRepository actualRouteRepository;
     private final HomeActualRouteSpotRepository actualRouteSpotRepository;
     private final HomeTouristSpotRepository touristSpotRepository;
+    private final HomePingLogTagRepository pingLogTagRepository;
     private final UserRepository userRepository; // auth 도메인의 AppUser Repository를 그대로 재사용합니다.
 
     public List<PopularTripResponse> getPopularTrips(String period, int limit) {
@@ -56,46 +60,77 @@ public class PopularTripService {
         return popularRouteIds.stream()
                 .map(routeById::get)
                 .filter(route -> route != null)
-                .map(route -> {
-                    List<ActualRouteSpot> spots = actualRouteSpotRepository
-                            .findByActualRouteIdOrderByVisitOrderAsc(route.getActualRouteId());
-                    Map<Long, TouristSpot> spotById = touristSpotRepository
-                            .findAllById(spots.stream().map(ActualRouteSpot::getSpotId).toList())
-                            .stream()
-                            .collect(java.util.stream.Collectors.toMap(TouristSpot::getSpotId, s -> s));
-
-                    List<String> stopNames = spots.stream()
-                            .map(s -> spotById.get(s.getSpotId()))
-                            .filter(s -> s != null)
-                            .map(TouristSpot::getName)
-                            .toList();
-                    String photoUrl = spots.stream()
-                            .map(s -> spotById.get(s.getSpotId()))
-                            .filter(s -> s != null)
-                            .map(TouristSpot::getImageUrl)
-                            .filter(url -> url != null && !url.isBlank())
-                            .findFirst()
-                            .orElse(null);
-
-                    // 핑 등록 시점 실제 GPS 좌표. 핑을 안 찍은 스팟은 null이라 여기서 걸러짐 -> 프론트 지도/경로 표시용
-                    List<CoordinateResponse> coordinates = spots.stream()
-                            .filter(s -> s.getLatitude() != null && s.getLongitude() != null)
-                            .map(s -> CoordinateResponse.builder()
-                                    .latitude(s.getLatitude().doubleValue())
-                                    .longitude(s.getLongitude().doubleValue())
-                                    .build())
-                            .toList();
-
-                    return PopularTripResponse.from(
-                            route,
-                            findNickname(route.getUserId()),
-                            savedRouteRepository.countRecentSavesByRouteId(route.getActualRouteId(), since),
-                            stopNames,
-                            photoUrl,
-                            spots.size(),
-                            coordinates);
-                })
+                .map(route -> buildTripResponse(route, since))
                 .toList();
+    }
+
+    // 이 키워드(해시태그)가 달린 후기가 있는 루트 목록. 탐색 > 인기 키워드 더보기에서 칩 선택 시 사용.
+    public List<PopularTripResponse> getRoutesByKeyword(String keyword, int limit) {
+        List<Long> routeIds = pingLogTagRepository.findActualRouteIdsByKeyword(keyword);
+        if (routeIds.isEmpty()) {
+            return List.of();
+        }
+
+        List<ActualRoute> routes = actualRouteRepository
+                .findByActualRouteIdInAndIsPublicTrueAndIsDeletedFalse(routeIds).stream()
+                .limit(limit)
+                .toList();
+
+        // savedCount 표시는 "이번주 인기 루트" 카드와 동일하게 최근 1주 기준으로 맞춤
+        LocalDateTime since = LocalDateTime.now().minusDays(WEEK_WINDOW_DAYS);
+
+        // 카드에 "#데이트 #바다"처럼 이 루트에 달린 태그 전부를 보여주기 위해 한 번에 조회
+        List<Long> shownRouteIds = routes.stream().map(ActualRoute::getActualRouteId).toList();
+        Map<Long, List<String>> tagsByRouteId = pingLogTagRepository.findTagsByRouteIds(shownRouteIds).stream()
+                .collect(Collectors.groupingBy(
+                        RouteTagProjection::getRouteId,
+                        Collectors.mapping(RouteTagProjection::getTagName, Collectors.toList())));
+
+        return routes.stream()
+                .map(route -> buildTripResponse(route, since).toBuilder()
+                        .tags(tagsByRouteId.getOrDefault(route.getActualRouteId(), List.of()))
+                        .build())
+                .toList();
+    }
+
+    private PopularTripResponse buildTripResponse(ActualRoute route, LocalDateTime savedCountSince) {
+        List<ActualRouteSpot> spots = actualRouteSpotRepository
+                .findByActualRouteIdOrderByVisitOrderAsc(route.getActualRouteId());
+        Map<Long, TouristSpot> spotById = touristSpotRepository
+                .findAllById(spots.stream().map(ActualRouteSpot::getSpotId).toList())
+                .stream()
+                .collect(java.util.stream.Collectors.toMap(TouristSpot::getSpotId, s -> s));
+
+        List<String> stopNames = spots.stream()
+                .map(s -> spotById.get(s.getSpotId()))
+                .filter(s -> s != null)
+                .map(TouristSpot::getName)
+                .toList();
+        String photoUrl = spots.stream()
+                .map(s -> spotById.get(s.getSpotId()))
+                .filter(s -> s != null)
+                .map(TouristSpot::getImageUrl)
+                .filter(url -> url != null && !url.isBlank())
+                .findFirst()
+                .orElse(null);
+
+        // 핑 등록 시점 실제 GPS 좌표. 핑을 안 찍은 스팟은 null이라 여기서 걸러짐 -> 프론트 지도/경로 표시용
+        List<CoordinateResponse> coordinates = spots.stream()
+                .filter(s -> s.getLatitude() != null && s.getLongitude() != null)
+                .map(s -> CoordinateResponse.builder()
+                        .latitude(s.getLatitude().doubleValue())
+                        .longitude(s.getLongitude().doubleValue())
+                        .build())
+                .toList();
+
+        return PopularTripResponse.from(
+                route,
+                findNickname(route.getUserId()),
+                savedRouteRepository.countRecentSavesByRouteId(route.getActualRouteId(), savedCountSince),
+                stopNames,
+                photoUrl,
+                spots.size(),
+                coordinates);
     }
 
     /** 지금은 "week"만 지원합니다. 다른 period(예: month, all)가 필요해지면 여기만 확장하면 됩니다. */

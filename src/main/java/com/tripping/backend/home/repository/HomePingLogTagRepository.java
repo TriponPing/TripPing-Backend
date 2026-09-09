@@ -29,4 +29,33 @@ public interface HomePingLogTagRepository extends JpaRepository<PingLogTag, Long
         ORDER BY COUNT(plt) DESC
         """)
     List<TagCountProjection> findPopularTags(@Param("since") LocalDateTime since, Pageable pageable);
+
+    /**
+     * 이 키워드(해시태그)가 달린 후기가 하나라도 있는 루트의 actualRouteId 목록.
+     * PingLog.actualRouteSpotId는 매핑된 연관관계가 아니라 순수 FK 컬럼이라, JPQL로는
+     * 엔티티끼리 조인이 안 돼서 네이티브 쿼리로 직접 조인함.
+     */
+    @Query(value = """
+        SELECT DISTINCT ars.actual_route_id
+        FROM ping_log_tag plt
+        JOIN tag t ON t.tag_id = plt.tag_id
+        JOIN ping_log pl ON pl.ping_log_id = plt.ping_log_id
+        JOIN actual_route_spot ars ON ars.actual_route_spot_id = pl.actual_route_spot_id
+        WHERE t.name = :keyword AND pl.is_deleted = false
+        """, nativeQuery = true)
+    List<Long> findActualRouteIdsByKeyword(@Param("keyword") String keyword);
+
+    /**
+     * 주어진 루트들 각각에 달린 해시태그 전부(중복 제거) - 키워드로 찾은 루트 카드에
+     * "#데이트 #바다"처럼 태그 칩을 보여주기 위함.
+     */
+    @Query(value = """
+        SELECT DISTINCT ars.actual_route_id AS routeId, t.name AS tagName
+        FROM ping_log_tag plt
+        JOIN tag t ON t.tag_id = plt.tag_id
+        JOIN ping_log pl ON pl.ping_log_id = plt.ping_log_id
+        JOIN actual_route_spot ars ON ars.actual_route_spot_id = pl.actual_route_spot_id
+        WHERE ars.actual_route_id IN (:routeIds) AND pl.is_deleted = false
+        """, nativeQuery = true)
+    List<RouteTagProjection> findTagsByRouteIds(@Param("routeIds") List<Long> routeIds);
 }
