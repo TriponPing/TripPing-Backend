@@ -46,4 +46,9 @@ public class PopularPlaceService {
                         savedPlaceRepository.countRecentSavesBySpotId(spot.getSpotId(), since)))
                 .toList();
     }
+
+    /** "인기 장소" 화면 진입 시 북마크 채워짐/빈 상태를 복원하기 위한, 내가 저장한 장소 spotId 전체 목록. */
+    public List<Long> getMySavedSpotIds(Long userId) {
+        return savedPlaceRepository.findSpotIdsByUserId(userId);
+    }
 }

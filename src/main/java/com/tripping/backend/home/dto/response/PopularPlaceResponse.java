@@ -19,6 +19,9 @@ public class PopularPlaceResponse {
     @Schema(description = "카테고리", example = "관광지")
     private String category;
 
+    @Schema(description = "주소", example = "서울 종로구 사직로 161")
+    private String address;
+
     @Schema(description = "이번 주 저장(찜) 수", example = "33")
     private long savedCount;
 
@@ -27,6 +30,7 @@ public class PopularPlaceResponse {
                 .spotId(spot.getSpotId())
                 .name(spot.getName())
                 .category(spot.getCategory())
+                .address(spot.getAddress())
                 .savedCount(savedCount)
                 .build();
     }
