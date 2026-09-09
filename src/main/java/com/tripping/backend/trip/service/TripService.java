@@ -5,7 +5,6 @@ import com.tripping.backend.entity.ActualRoute;
 import com.tripping.backend.entity.ActualRouteSpot;
 import com.tripping.backend.entity.PlannedRoute;
 import com.tripping.backend.entity.PlannedRouteSpot;
-import com.tripping.backend.entity.RouteStatus;
 import com.tripping.backend.route.repository.PlannedRouteRepository;
 import com.tripping.backend.route.repository.PlannedRouteSpotRepository;
 import com.tripping.backend.trip.dto.TripCreateRequest;
@@ -15,10 +14,12 @@ import com.tripping.backend.trip.dto.TripRouteMapSearchResponse;
 import com.tripping.backend.trip.repository.TripActualRouteRepository;
 import com.tripping.backend.trip.repository.TripActualRouteSpotRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
-import org.springframework.stereotype.Service;
-import java.util.List;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -30,17 +31,13 @@ public class TripService {
     private final TripActualRouteSpotRepository actualRouteSpotRepository;
     private final com.tripping.backend.home.repository.HomeSavedRouteRepository savedRouteRepository;
 
-
-    public ActualRoute getCurrentInProgressRoute(Long userId) {
+    // ⭐️ [수정] 유저에게 진행중(IN_PROGRESS)인 여행이 실수로 2개 이상 남아있어도
+    // 에러 안 나게 Pageable로 딱 1개만(가장 최근 것) 가져오도록 변경
+    public CurrentTripResponse getCurrentInProgressRoute(Long userId) {
         List<ActualRoute> routes = actualRouteRepository
-                .findByUserIdAndStatusAndIsDeletedFalseOrderByActualRouteIdDesc(userId, RouteStatus.IN_PROGRESS);
+                .findInProgressRoutes(userId, PageRequest.of(0, 1));
 
-        if (routes.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "진행 중인 여행이 없습니다.");
-        }
-
-        // 가장 최근 것 하나만 툭 반환!
-        return routes.getFirst();
+        return routes.isEmpty() ? null : new CurrentTripResponse(routes.get(0));
     }
 
     // 실제 여행으로 저장 (PlannedRoute -> ActualRoute 복사)
@@ -56,7 +53,7 @@ public class TripService {
         // 1-1. 이미 진행 중인 여행이 있으면 새로 시작 못 하게 막음 - 유저당 IN_PROGRESS는 항상 1개여야
         // 홈 화면 "진행 중인 여행" 조회 등에서 어느 걸 보여줘야 할지 애매해지는 걸 방지함.
         boolean hasInProgressTrip = !actualRouteRepository
-                .findByUserIdAndStatusAndIsDeletedFalseOrderByActualRouteIdDesc(userId, RouteStatus.IN_PROGRESS)
+                .findInProgressRoutes(userId, PageRequest.of(0, 1))
                 .isEmpty();
         if (hasInProgressTrip) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 진행 중인 여행이 있습니다. 먼저 완료 처리해주세요.");
