@@ -15,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
+import com.tripping.backend.trip.dto.CurrentTripResponse;
 
 @RestController
 @RequestMapping("/routes")
@@ -46,12 +47,12 @@ public class TripController {
     // ⭐️ [추가] Ping 탭 등에서 id 없이도 현재 진행 중인 여행을 스스로 조회하는 API
     @GetMapping("/current")
     @Operation(summary = "진행 중인 여행 조회", description = "유저의 IN_PROGRESS 상태인 최신 여행 정보를 조회합니다.")
-    public ResponseEntity<ActualRoute> getCurrentRoute(
+    public ResponseEntity<CurrentTripResponse> getCurrentRoute(
             @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
         Long userId = userDetails != null ? userDetails.getUserId() : 1L; // 임시 방어 코드
 
-        ActualRoute response = tripService.getCurrentInProgressRoute(userId); // 서비스 메서드명 일치화
+        CurrentTripResponse response = tripService.getCurrentInProgressRoute(userId);// 서비스 메서드명 일치화
 
         if (response == null) {
             return ResponseEntity.noContent().build(); // 진행 중인 여행이 없으면 204 No Content
