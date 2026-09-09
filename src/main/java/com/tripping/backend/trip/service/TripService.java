@@ -5,6 +5,7 @@ import com.tripping.backend.entity.ActualRoute;
 import com.tripping.backend.entity.ActualRouteSpot;
 import com.tripping.backend.entity.PlannedRoute;
 import com.tripping.backend.entity.PlannedRouteSpot;
+import com.tripping.backend.entity.RouteStatus;
 import com.tripping.backend.route.repository.PlannedRouteRepository;
 import com.tripping.backend.route.repository.PlannedRouteSpotRepository;
 import com.tripping.backend.trip.dto.TripCreateRequest;
@@ -32,7 +33,7 @@ public class TripService {
 
     public ActualRoute getCurrentInProgressRoute(Long userId) {
         List<ActualRoute> routes = actualRouteRepository
-                .findByUserIdAndStatusAndIsDeletedFalseOrderByActualRouteIdDesc(userId, "IN_PROGRESS");
+                .findByUserIdAndStatusAndIsDeletedFalseOrderByActualRouteIdDesc(userId, RouteStatus.IN_PROGRESS);
 
         if (routes.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "진행 중인 여행이 없습니다.");
@@ -50,6 +51,15 @@ public class TripService {
 
         if (!plannedRoute.getUserId().equals(userId)) {
             throw new IllegalArgumentException("본인의 루트만 여행으로 전환할 수 있습니다.");
+        }
+
+        // 1-1. 이미 진행 중인 여행이 있으면 새로 시작 못 하게 막음 - 유저당 IN_PROGRESS는 항상 1개여야
+        // 홈 화면 "진행 중인 여행" 조회 등에서 어느 걸 보여줘야 할지 애매해지는 걸 방지함.
+        boolean hasInProgressTrip = !actualRouteRepository
+                .findByUserIdAndStatusAndIsDeletedFalseOrderByActualRouteIdDesc(userId, RouteStatus.IN_PROGRESS)
+                .isEmpty();
+        if (hasInProgressTrip) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 진행 중인 여행이 있습니다. 먼저 완료 처리해주세요.");
         }
 
         // 2. ActualRoute 새로 생성 (복사)
