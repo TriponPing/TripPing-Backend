@@ -17,6 +17,12 @@ public class RegionController {
 
     private final RegionService regionService;
 
+    @GetMapping
+    @Operation(summary = "전체 지역 목록 조회", description = "회원가입 시 거주 지역 선택 등에 사용하는 전체 지역 목록입니다.")
+    public ResponseEntity<List<RegionSearchResponse>> getAllRegions() {
+        return ResponseEntity.ok(regionService.getAllRegions());
+    }
+
     @GetMapping("/search")
     @Operation(summary = "여행 지역 검색")
     public ResponseEntity<List<RegionSearchResponse>> searchRegions(@RequestParam String keyword) {

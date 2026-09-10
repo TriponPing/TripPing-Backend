@@ -27,6 +27,7 @@ public class JoinService {
                 .email(request.getEmail())
                 .password(passwordEncoder.encode(request.getPassword())) // BCrypt로 암호화
                 .nickname(request.getNickname())
+                .regionId(request.getRegionId()) // 거주 지역 - 지역핑(지역 커뮤니티) 필터/등록 권한에 사용됨
                 .role("ROLE_USER") // 기본 권한 부여
                 .build();
 

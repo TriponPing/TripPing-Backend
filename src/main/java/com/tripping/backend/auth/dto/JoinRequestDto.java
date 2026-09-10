@@ -7,4 +7,5 @@ public class JoinRequestDto {
     private String email; // 사용자가 입력한 이메일 (아이디로 사용)
     private String password; // 사용자가 입력한 비밀번호
     private String nickname; // 사용자가 입력한 닉네임
+    private String regionId; // 회원가입 시 선택한 거주 지역 (Region.regionId, 예: "R01")
 }
