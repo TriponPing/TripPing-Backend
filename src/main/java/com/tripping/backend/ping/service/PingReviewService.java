@@ -36,6 +36,15 @@ public class PingReviewService {
     private final TagRepository tagRepository;
     private final PingLogTagRepository pingLogTagRepository;
 
+    // 👈 새로 추가: Ping 후기 조회 - GET /pings/{pingId}/review
+    // 후기 작성 화면 진입 시 이미 등록된 후기가 있는지 확인해서 등록/수정 모드를 판단하는 데 씀.
+    // 후기가 없으면 findActiveReview()가 404를 던지는데, 프론트에서는 이걸 "아직 후기 없음"으로 해석함.
+    public PingReviewResponse getReview(Long userId, Long pingId) {
+        findOwnedSpot(userId, pingId);
+        PingLog log = findActiveReview(pingId);
+        return toResponse(pingId, log);
+    }
+
     // Ping 후기 등록 - POST /pings/{pingId}/review
     @Transactional
     public PingReviewResponse createReview(Long userId, Long pingId, PingReviewRequest request) {
