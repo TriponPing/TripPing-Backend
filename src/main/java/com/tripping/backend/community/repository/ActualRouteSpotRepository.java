@@ -15,4 +15,7 @@ public interface ActualRouteSpotRepository extends JpaRepository<ActualRouteSpot
      */
     @Query("SELECT DISTINCT ars.actualRouteId FROM ActualRouteSpot ars WHERE ars.spotId IN :spotIds")
     List<Long> findDistinctActualRouteIdsBySpotIdIn(@Param("spotIds") List<Long> spotIds);
+
+    // 루트 목록 카드에 "강남 → 코엑스 → 석촌호수" 같은 경유지 미리보기를 보여주기 위한 일괄 조회
+    List<ActualRouteSpot> findByActualRouteIdInOrderByActualRouteIdAscVisitOrderAsc(List<Long> actualRouteIds);
 }
