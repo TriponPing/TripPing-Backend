@@ -28,7 +28,8 @@ public class SecurityConfig {
     private static final String[] ALLOW_LIST = {
             "/auth/join", "/auth/login",
             "/places/**", "/map/places/**",   // 테스트용으로 임시 추가
-            "/routes/map/search"
+            "/routes/map/search",
+            "/regions" // 회원가입(사는 지역 선택) 화면은 로그인 전이라 전체 지역 목록 조회는 열어둬야 함
     };
 
     // permitAll 경로에서 에러(400/401 등)가 나면 스프링이 내부적으로 /error 로 다시 요청을 보내는데,
