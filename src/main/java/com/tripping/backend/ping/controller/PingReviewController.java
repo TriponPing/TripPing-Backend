@@ -22,6 +22,18 @@ public class PingReviewController {
 
     private final PingReviewService pingReviewService;
 
+    // 👈 새로 추가: GET 매핑이 빠져있어서 프론트가 "기존 후기 있는지" 확인할 때 405가 나던 문제 수정.
+    // 이것 때문에 항상 "등록" 모드로만 뜨고, 이미 있는 후기가 있어도 수정 모드로 전환이 안 되고 있었음.
+    @Operation(summary = "Ping 후기 조회", description = "등록된 후기를 조회합니다. 없으면 404 - 후기 작성 화면 진입 시 등록/수정 모드 판단용.")
+    @GetMapping("/{pingId}/review")
+    public ResponseEntity<PingReviewResponse> getReview(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long pingId
+    ) {
+        requireLogin(userDetails);
+        return ResponseEntity.ok(pingReviewService.getReview(userDetails.getUserId(), pingId));
+    }
+
     @Operation(summary = "Ping 후기 등록", description = "방문 스팟(pingId=ACTUAL_ROUTE_SPOT id)에 평점/사진/코멘트 후기를 등록합니다.")
     @PostMapping("/{pingId}/review")
     public ResponseEntity<PingReviewResponse> createReview(
