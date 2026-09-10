@@ -119,6 +119,22 @@ public class PingService {
         );
     }
 
+    // 여행 기록(방문 스팟)에서 하나 삭제 - DELETE /trips/{routeId}/spots/{actualRouteSpotId}
+    // 진행중/완료 상관없이 실수로 잘못 찍은 방문 기록을 지울 수 있게 함 (ACTUAL_ROUTE_SPOT 하드 삭제).
+    @Transactional
+    public void deleteSpotFromTrip(Long userId, Long routeId, Long actualRouteSpotId) {
+        findOwnedRoute(userId, routeId); // 소유권 검증
+
+        ActualRouteSpot spot = actualRouteSpotRepository.findById(actualRouteSpotId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "방문 기록을 찾을 수 없습니다."));
+
+        if (!spot.getActualRouteId().equals(routeId)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "해당 여행의 방문 기록이 아닙니다.");
+        }
+
+        actualRouteSpotRepository.delete(spot);
+    }
+
     private ActualRoute findOwnedRoute(Long userId, Long routeId) {
         return actualRouteRepository.findByActualRouteIdAndUserIdAndIsDeletedFalse(routeId, userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "여행을 찾을 수 없습니다."));

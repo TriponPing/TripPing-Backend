@@ -20,6 +20,7 @@ public record TripDetailResponse(
         List<SpotDetail> spots
 ) {
     public record SpotDetail(
+            Long actualRouteSpotId, // 핑 후기(리뷰) 등록/수정 API의 pingId, 여행 기록 삭제 API의 id로 씀
             Integer visitOrder,
             Long spotId,
             String spotName,

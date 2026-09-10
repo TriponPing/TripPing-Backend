@@ -72,6 +72,19 @@ public class PingController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
+    // 👈 새로 추가: 여행 기록(방문 스팟) 삭제
+    @Operation(summary = "여행 기록 삭제", description = "실수로 잘못 찍은 방문 스팟 기록을 삭제합니다. (ACTUAL_ROUTE_SPOT)")
+    @DeleteMapping("/trips/{routeId}/spots/{actualRouteSpotId}")
+    public ResponseEntity<Void> deleteTripSpot(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long routeId,
+            @PathVariable Long actualRouteSpotId
+    ) {
+        requireLogin(userDetails);
+        pingService.deleteSpotFromTrip(userDetails.getUserId(), routeId, actualRouteSpotId);
+        return ResponseEntity.noContent().build();
+    }
+
     private void requireLogin(CustomUserDetails userDetails) {
         if (userDetails == null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "로그인이 필요합니다.");
