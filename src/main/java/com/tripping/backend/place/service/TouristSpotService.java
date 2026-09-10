@@ -192,6 +192,7 @@ public class TouristSpotService {
                 .category(request.category())
                 .latitude(request.latitude())
                 .longitude(request.longitude())
+                .regionId(request.regionId()) // 지역핑 흐름에서 넘어온 경우에만 채워짐, 그 외엔 null
                 .createdByUserId(userId)
                 .build();
 
