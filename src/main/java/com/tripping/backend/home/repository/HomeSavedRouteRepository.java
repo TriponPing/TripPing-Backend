@@ -35,6 +35,9 @@ public interface HomeSavedRouteRepository extends JpaRepository<SavedRoute, Long
         """)
     long countRecentSavesByRouteId(@Param("routeId") Long routeId, @Param("since") LocalDateTime since);
 
+    // Spring Data JPA가 메서드 이름만으로 자동 생성해주는 쿼리라 @Query 필요 없어요
+    long countByActualRouteId(Long actualRouteId);
+
     @Query("SELECT sr.actualRouteId FROM SavedRoute sr WHERE sr.userId = :userId")
     List<Long> findActualRouteIdsByUserId(@Param("userId") Long userId);
 }
