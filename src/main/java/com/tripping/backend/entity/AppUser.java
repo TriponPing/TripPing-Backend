@@ -25,7 +25,18 @@ public class AppUser {
     @Column(nullable = false, length = 50)
     private String nickname;
 
-    @Column(name = "profile_image", length = 255)
+    // 👈 수정: 255자 제한이었는데, 아직 별도 이미지 업로드/저장소가 없어서 프론트가 사진을
+    // base64 데이터 URI로 인코딩해 그대로 저장함 - 255자로는 어림도 없어서 길이 제한을 없앰.
+    // ⚠️ @Lob은 절대 쓰면 안 됨 - PostgreSQL + Hibernate 조합에서 String에 @Lob을 붙이면
+    // text가 아니라 oid(Large Object 참조)로 매핑되는 경우가 있는데, 이 oid 값을 읽으려면
+    // 저장할 때와 같은 트랜잭션이 열려있어야 해서, 로그인처럼 트랜잭션 밖(또는 다른 트랜잭션)에서
+    // 유저 엔티티를 조회하면 그 즉시 예외가 나서 로그인 자체가 403으로 막혀버림 (실제로 겪은 버그).
+    // 컬럼명을 profile_image_data로 새로 바꿈 - 예전 profile_image 컬럼이 이미 실제 DB에서
+    // oid 타입으로 굳어버려서, ddl-auto=update의 ALTER로는 안전하게 text로 못 되돌림(시도해보니
+    // 여전히 oid로 남아있어서 긴 문자열 저장 시 500 에러). 새 컬럼명을 쓰면 Hibernate가 위험한
+    // ALTER 대신 깨끗한 CREATE로 처리해서 처음부터 text로 정상 생성됨. 예전 profile_image
+    // 컬럼은 더 이상 안 쓰고 그냥 버려둠(안에 든 값도 이미 의미 없는 oid 숫자뿐이라 버려도 무방).
+    @Column(name = "profile_image_data", columnDefinition = "text")
     private String profileImage;
 
     @Column(name = "region_id", length = 3)
