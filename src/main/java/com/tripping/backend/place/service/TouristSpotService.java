@@ -25,6 +25,8 @@ public class TouristSpotService {
     private final PlaceTouristSpotRepository touristSpotRepository;
     private final HomeActualRouteSpotRepository actualRouteSpotRepository;
     private final PingService pingService;
+    private final com.tripping.backend.home.repository.HomeSavedRouteRepository savedRouteRepository;
+    private final TourApiService tourApiService;
 
     public List<TouristSpotResponse> searchByLocation(double lat, double lng, double radius) {
         return touristSpotRepository.findWithinRadius(lat, lng, radius).stream()
@@ -105,7 +107,14 @@ public class TouristSpotService {
         SpotPingStatsResponse stats = pingService.getSpotPingStats(spotId);
 
         List<Long> routeIds = actualRouteSpotRepository.findPublicRouteIdsBySpotId(spotId);
+
+        // 저장(찜) 수를 미리 다 계산해두고, 저장 많은 순으로 정렬해서 상위 3개만
+        Map<Long, Long> savedCountByRouteId = routeIds.stream()
+                .collect(java.util.stream.Collectors.toMap(id -> id, savedRouteRepository::countByActualRouteId));
+
         List<RegisteredRouteCardResponse> registeredRoutes = routeIds.stream()
+                .sorted(java.util.Comparator.comparingLong((Long id) -> savedCountByRouteId.getOrDefault(id, 0L)).reversed())
+                .limit(3)
                 .map(this::buildRouteCard)
                 .toList();
 
@@ -198,6 +207,31 @@ public class TouristSpotService {
 
         TouristSpot saved = touristSpotRepository.save(spot);
         return new TouristSpotResponse(saved);
+    }
+
+    // 이름으로 TourAPI에서 검색 -> contentId 찾고 -> 설명(overview) 가져와서 description에 채워넣음.
+    // 한 번에 너무 많이 부르면 하루 호출 한도(보통 1000회) 넘을 수 있어서 limit으로 나눠서 실행.
+    @Transactional
+    public int backfillDescriptionsFromTourApi(int limit) {
+        List<TouristSpot> targets = touristSpotRepository
+                .findByDescriptionIsNull(org.springframework.data.domain.PageRequest.of(0, limit));
+
+        int updatedCount = 0;
+        for (TouristSpot spot : targets) {
+            String contentId = tourApiService.findContentId(spot.getName());
+            if (contentId == null) {
+                continue;
+            }
+            String overview = tourApiService.fetchOverview(contentId);
+            if (overview == null) {
+                continue;
+            }
+            spot.setApiContentId(contentId);
+            spot.setDescription(overview);
+            touristSpotRepository.save(spot);
+            updatedCount++;
+        }
+        return updatedCount;
     }
 
 }

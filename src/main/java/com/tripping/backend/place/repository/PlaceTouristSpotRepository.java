@@ -20,6 +20,8 @@ public interface PlaceTouristSpotRepository extends JpaRepository<TouristSpot, L
     List<TouristSpot> findByRegionIdAndNameContainingIgnoreCase(String regionId, String name);
     List<TouristSpot> findByNameContainingIgnoreCase(String name);
 
+    List<TouristSpot> findByDescriptionIsNull(org.springframework.data.domain.Pageable pageable);
+
     // 지도 기반 반경 검색 (Haversine 공식)
     @Query(value = """
         SELECT * FROM tourist_spot t

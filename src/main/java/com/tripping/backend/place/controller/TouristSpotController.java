@@ -89,4 +89,13 @@ public class TouristSpotController {
         return ResponseEntity.ok(touristSpotService.getSpotDetail(placeId));
     }
 
+    @PostMapping("/places/admin/backfill-descriptions")
+    @Operation(summary = "[관리용] TourAPI로 장소 설명 일괄 채우기", description = "description이 비어있는 장소들에 한국관광공사 API로 설명을 채워넣습니다.")
+    public ResponseEntity<String> backfillDescriptions(
+            @RequestParam(defaultValue = "30") int limit
+    ) {
+        int updated = touristSpotService.backfillDescriptionsFromTourApi(limit);
+        return ResponseEntity.ok(updated + "개 장소에 설명을 채웠습니다.");
+    }
+
 }
