@@ -14,6 +14,18 @@ public interface HomeActualRouteSpotRepository extends JpaRepository<ActualRoute
     /** "이번주 인기 여행" 카드에 표시할 방문 순서대로의 스팟 목록 (spotId, 사진, 이름은 TouristSpot에서 별도 조회). */
     List<ActualRouteSpot> findByActualRouteIdOrderByVisitOrderAsc(Long actualRouteId);
 
+    // 👈 새로 추가: "Pinger" 레벨 계산용 - 이 유저가 지금까지 찍은 핑(방문 스팟) 총 개수.
+    // ActualRouteSpot ↔ ActualRoute 사이에 연관관계 매핑이 없어서(FK만 존재), 다른 쿼리들처럼
+    // 두 엔티티를 콤마로 나열해 actualRouteId = actualRouteId 조건으로 직접 조인함.
+    @Query("""
+            select count(ars)
+            from ActualRouteSpot ars, ActualRoute ar
+            where ars.actualRouteId = ar.actualRouteId
+              and ar.userId = :userId
+              and ar.isDeleted = false
+            """)
+    long countByWriterUserId(@Param("userId") Long userId);
+
     /**
      * "떠오르는 인기 장소": 최근 visitTime 기준으로 방문(핑) 기록이 많은 관광지 spotId 를
      * 방문 횟수 내림차순으로 조회합니다. Pageable 로 상위 N개만 잘라옵니다.

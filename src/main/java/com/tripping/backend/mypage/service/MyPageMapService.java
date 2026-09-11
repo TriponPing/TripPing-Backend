@@ -250,8 +250,20 @@ public class MyPageMapService {
         if (matchedIds.isEmpty()) {
             return List.of();
         }
+        // 👈 새로 추가: 결과에 이름/좌표를 같이 내려주기 위해 대표 스팟(방문순서 1번)을 같이 조회
+        Map<Long, RepresentativeSpotFinder.RepresentativeSpot> repByRoute = representativeSpotFinder.find(matchedIds);
         return actualRouteRepository.findAllById(matchedIds).stream()
-                .map(route -> new MapSearchResponse(route.getActualRouteId(), type, route.getTravelDate()))
+                .map(route -> {
+                    RepresentativeSpotFinder.RepresentativeSpot rep = repByRoute.get(route.getActualRouteId());
+                    return new MapSearchResponse(
+                            route.getActualRouteId(),
+                            type,
+                            route.getTravelDate(),
+                            rep != null ? rep.spotName() : null,
+                            rep != null ? rep.latitude() : null,
+                            rep != null ? rep.longitude() : null
+                    );
+                })
                 .toList();
     }
 

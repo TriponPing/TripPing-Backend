@@ -28,4 +28,28 @@ public interface MyPageActualRouteSpotRepository extends JpaRepository<ActualRou
               and ts.name like concat('%', :keyword, '%')
             """)
     List<Long> findRouteIdsBySpotNameKeyword(@Param("routeIds") List<Long> routeIds, @Param("keyword") String keyword);
+
+    // 뱃지 "첫 발걸음" 달성 여부 판단용 - 이 유저가 지금까지 찍은 핑(방문 스팟) 총 개수
+    @Query("""
+            select count(ars)
+            from ActualRouteSpot ars, ActualRoute ar
+            where ars.actualRouteId = ar.actualRouteId
+              and ar.userId = :userId
+              and ar.isDeleted = false
+            """)
+    long countByUserId(@Param("userId") Long userId);
+
+    // 뱃지 "지역 정복자"/"전국일주 탐험가" 달성 여부 판단용 - 이 유저가 핑을 찍은 서로 다른 지역(regionId) 개수.
+    // ActualRouteSpot ↔ ActualRoute, ActualRouteSpot ↔ TouristSpot 둘 다 연관관계 매핑이 없어서
+    // 세 엔티티를 콤마로 나열해 직접 조인함(다른 쿼리들과 동일한 패턴).
+    @Query("""
+            select count(distinct ts.regionId)
+            from ActualRouteSpot ars, ActualRoute ar, TouristSpot ts
+            where ars.actualRouteId = ar.actualRouteId
+              and ars.spotId = ts.spotId
+              and ar.userId = :userId
+              and ar.isDeleted = false
+              and ts.regionId is not null
+            """)
+    long countDistinctRegionsByUserId(@Param("userId") Long userId);
 }

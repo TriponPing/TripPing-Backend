@@ -21,4 +21,7 @@ public interface MyPageSavedRouteRepository extends JpaRepository<SavedRoute, Lo
 
     // 루트 저장(북마크) 시 중복 저장 방지용
     boolean existsByUserIdAndActualRouteId(Long userId, Long actualRouteId);
+
+    // 뱃지 "보물 창고" 달성 여부 판단용 - 이 유저가 저장한 루트 개수
+    long countByUserId(Long userId);
 }
