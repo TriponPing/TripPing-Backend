@@ -16,4 +16,7 @@ public interface MyPageSavedPlaceRepository extends JpaRepository<SavedPlace, Lo
 
     // 카드에 표시할 "저장 N" - 이 장소를 저장한 전체 유저 수(전체 기간, 본인 포함)
     long countBySpotId(Long spotId);
+
+    // 뱃지 "보물 창고" 달성 여부 판단용 - 이 유저가 저장한 장소 개수
+    long countByUserId(Long userId);
 }

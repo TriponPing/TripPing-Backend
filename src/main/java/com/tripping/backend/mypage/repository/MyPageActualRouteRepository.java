@@ -1,6 +1,7 @@
 package com.tripping.backend.mypage.repository;
 
 import com.tripping.backend.entity.ActualRoute;
+import com.tripping.backend.entity.RouteStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -9,6 +10,9 @@ import java.util.List;
 import java.util.Optional;
 
 public interface MyPageActualRouteRepository extends JpaRepository<ActualRoute, Long> {
+
+    // 뱃지 "완주의 기쁨"/"다작 여행가" 달성 여부 판단용 - 완주(COMPLETED)한 여행 개수
+    long countByUserIdAndIsDeletedFalseAndStatus(Long userId, RouteStatus status);
 
     // 다녀온 여행 목록 조회(요약) - 최근 5개
     List<ActualRoute> findTop5ByUserIdAndIsDeletedFalseOrderByTravelDateDesc(Long userId);
