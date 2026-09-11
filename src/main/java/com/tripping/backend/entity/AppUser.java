@@ -46,9 +46,12 @@ public class AppUser {
     @Column(length = 20)
     private String language = "ko";
 
-    @Enumerated(EnumType.STRING)
-    @Builder.Default
-    private UserLevel level = UserLevel.새끼; // TR-31 레벨 시스템
+    // 👈 수정: 레벨을 AppUser에 저장해두던 걸 제거함 - 예전 레벨 이름(새끼/약지/중지/검지/엄지)이
+    // 그대로 DB에 문자열로 박혀있어서, 10단계 새 이름(UserLevel 참고)으로 enum을 바꾸면
+    // 기존 값이 새 enum 상수와 하나도 안 맞아 그 유저를 조회(로그인 포함)할 때마다
+    // Enum.valueOf 예외가 터져 전부 로그인이 막히는 위험이 있었음(전에 겪었던 것과 같은 종류의
+    // 버그). 대신 레벨은 저장하지 않고, 조회 시점의 총 핑 개수로 매번 새로 계산함
+    // (MyPageProfileService 참고) - 핑 찍을 때마다 레벨업이 항상 실제 활동량과 정확히 일치함.
 
     @Builder.Default
     @Column(name = "is_resident_pinger")

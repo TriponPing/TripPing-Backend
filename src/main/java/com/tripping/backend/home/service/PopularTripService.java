@@ -5,6 +5,7 @@ import com.tripping.backend.entity.ActualRoute;
 import com.tripping.backend.entity.ActualRouteSpot;
 import com.tripping.backend.entity.AppUser;
 import com.tripping.backend.entity.TouristSpot;
+import com.tripping.backend.entity.UserLevel;
 import com.tripping.backend.home.dto.response.CoordinateResponse;
 import com.tripping.backend.home.dto.response.PopularTripResponse;
 import com.tripping.backend.home.repository.HomeActualRouteRepository;
@@ -194,7 +195,10 @@ public class PopularTripService {
                 .routeId(route.getActualRouteId())
                 .writerNickname(writer != null ? writer.getNickname() : UNKNOWN_NICKNAME)
                 .writerProfileImage(writer != null ? writer.getProfileImage() : null)
-                .writerLevel(writer != null && writer.getLevel() != null ? writer.getLevel().name() : null)
+                // 👈 수정: level을 AppUser에서 직접 읽던 것 -> 총 핑 개수 기준으로 계산 (이유는 AppUser 주석 참고)
+                .writerLevel(writer != null
+                        ? UserLevel.fromPingCount((int) actualRouteSpotRepository.countByWriterUserId(writer.getUserId())).name()
+                        : null)
                 .stops(stops)
                 .placeCount(stops.size())
                 .photoUrl(photoUrl)
