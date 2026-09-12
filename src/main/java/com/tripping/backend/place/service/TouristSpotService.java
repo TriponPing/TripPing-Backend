@@ -201,9 +201,22 @@ public class TouristSpotService {
                 .category(request.category())
                 .latitude(request.latitude())
                 .longitude(request.longitude())
-                .regionId(request.regionId()) // 지역핑 흐름에서 넘어온 경우에만 채워짐, 그 외엔 null
                 .createdByUserId(userId)
                 .build();
+
+        // TourAPI에서 이름으로 검색해서 설명 자동으로 채워넣기 (실패해도 등록 자체는 계속 진행됨)
+        try {
+            String contentId = tourApiService.findContentId(request.name());
+            if (contentId != null) {
+                String overview = tourApiService.fetchOverview(contentId);
+                if (overview != null) {
+                    spot.setApiContentId(contentId);
+                    spot.setDescription(overview);
+                }
+            }
+        } catch (Exception e) {
+            // TourAPI 실패해도 장소 등록 자체는 막지 않음. 나중에 백필로 다시 채울 수 있음.
+        }
 
         TouristSpot saved = touristSpotRepository.save(spot);
         return new TouristSpotResponse(saved);
