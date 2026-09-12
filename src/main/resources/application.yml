@@ -19,6 +19,7 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
     show-sql: true
 
+
 tour-api:
   service-key: VSRjuqr0bQ8H3qPSxevdKSdZK/6gYpdKUlS2cBeQvfo66fPUaEzbG+eoCoPelUKDsa2nZBQtHM72Hx21FlVn2A==
   base-url: https://apis.data.go.kr/B551011/KorService2
