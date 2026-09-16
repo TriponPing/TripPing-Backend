@@ -126,6 +126,27 @@ public interface HomeActualRouteSpotRepository extends JpaRepository<ActualRoute
         """, nativeQuery = true)
     Long countDistinctRoutesBySpotId(@Param("spotId") Long spotId);
 
+    // 👈 새로 추가: "인기 장소" 카드 사진용. 이 장소 후기(ping_log) 중 사진이 등록된 것들을,
+    // 그 후기가 달린 루트(여행)가 얼마나 저장(찜)됐는지 기준으로 우선순위를 매겨 하나만 뽑음
+    // (저장 많이 된 루트의 후기 사진일수록 신뢰도 높은 대표 사진일 거라는 가정). 저장 수가
+    // 같으면(둘 다 0 포함) 최신 후기를 우선함. 사진 등록된 후기가 하나도 없으면 null.
+    @Query(value = """
+        SELECT pl.photo_url
+        FROM ping_log pl
+        JOIN actual_route_spot ars ON ars.actual_route_spot_id = pl.actual_route_spot_id
+        LEFT JOIN (
+            SELECT actual_route_id, COUNT(*) AS save_count
+            FROM saved_route
+            GROUP BY actual_route_id
+        ) sr ON sr.actual_route_id = ars.actual_route_id
+        WHERE ars.spot_id = :spotId
+          AND pl.photo_url IS NOT NULL
+          AND pl.is_deleted = false
+        ORDER BY COALESCE(sr.save_count, 0) DESC, pl.created_at DESC
+        LIMIT 1
+        """, nativeQuery = true)
+    String findBestReviewPhotoUrlBySpotId(@Param("spotId") Long spotId);
+
     // 이 장소를 포함한 공개 루트들의 actual_route_id 목록
     @Query(value = """
         SELECT DISTINCT ar.actual_route_id
@@ -137,11 +158,13 @@ public interface HomeActualRouteSpotRepository extends JpaRepository<ActualRoute
         """, nativeQuery = true)
     List<Long> findPublicRouteIdsBySpotId(@Param("spotId") Long spotId);
 
-    // 이 장소에 달린 후기(별점+텍스트) 목록. 작성자 닉네임까지 조인해서 가져옴
+    // 이 장소에 달린 후기(별점+텍스트+사진+작성일) 목록. 작성자 닉네임까지 조인해서 가져옴
     @Query(value = """
         SELECT pl.rating AS rating,
                pl.review_comment AS reviewComment,
-               u.nickname AS writerNickname
+               u.nickname AS writerNickname,
+               pl.photo_url AS photoUrl,
+               pl.created_at AS createdAt
         FROM ping_log pl
         JOIN actual_route_spot ars ON ars.actual_route_spot_id = pl.actual_route_spot_id
         JOIN actual_route ar ON ar.actual_route_id = ars.actual_route_id
@@ -157,6 +180,8 @@ public interface HomeActualRouteSpotRepository extends JpaRepository<ActualRoute
         Integer getRating();
         String getReviewComment();
         String getWriterNickname();
+        String getPhotoUrl();
+        LocalDateTime getCreatedAt();
     }
 
 }

@@ -17,4 +17,6 @@ public class SpotDetailResponse {
     private String popularTimeSlot;
     private List<RegisteredRouteCardResponse> registeredRoutes;
     private List<SpotReviewResponse> reviews;
+    private Double averageRating;
+    private int reviewCount;
 }

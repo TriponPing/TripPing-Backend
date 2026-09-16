@@ -62,6 +62,10 @@ public class SecurityConfig {
                         .requestMatchers(ALLOW_LIST).permitAll() // ALLOW_LIST에 있는 주소는 로그인 없이 누구나 접근 가능
                         .requestMatchers("/swagger-ui/**").permitAll()// Swagger 문서 접근 허용
                         .requestMatchers("/v3/api-docs/**").permitAll() // Swagger API Docs 허용
+                        // 👈 새로 추가: 업로드된 이미지는 조회(GET)만 로그인 없이 열어둠 - Coil 등에서
+                        // 이미지 <img> 요청처럼 매번 세션 쿠키를 기대하기 어려워서. 업로드(POST)는
+                        // 아래 anyRequest().authenticated()에 걸려 그대로 로그인 필요함.
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/uploads/**").permitAll()
                         .anyRequest().authenticated() // 그 외의 모든 요청은 반드시 로그인이 필요함
                 )
                 .formLogin(form -> form.disable()) // 기본 제공되는 HTML 폼 로그인 화면 비활성화 (우리가 직접만든 AuthController 사용)

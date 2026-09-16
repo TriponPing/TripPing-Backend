@@ -39,13 +39,12 @@ public interface PlaceTouristSpotRepository extends JpaRepository<TouristSpot, L
             @Param("radius") double radiusKm
     );
 
-    // "동네핑거가 등록한" 장소: 등록자가 그 지역 거주 + 주민핑거 인증된 경우만
+    // "동네핑거가 등록한" 장소: 등록자가 그 지역 거주자인 경우 (회원가입 때 선택한 거주 지역 = 지역핑 등록/필터 권한)
     @Query(value = """
         SELECT ts.* FROM tourist_spot ts
         JOIN app_user u ON u.user_id = ts.created_by_user_id
         WHERE ts.category = :category
           AND u.region_id = :regionId
-          AND u.is_resident_pinger = true
         """, nativeQuery = true)
     List<TouristSpot> findByCategoryAndCreatorRegionAndResidentPinger(
             @Param("category") String category,

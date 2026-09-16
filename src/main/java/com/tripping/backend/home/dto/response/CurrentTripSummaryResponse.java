@@ -42,7 +42,27 @@ public class CurrentTripSummaryResponse {
     @Schema(description = "지금까지 등록된 Ping의 방문 장소 이름 목록 (등록 순서)")
     private List<String> visitedPlaceNames;
 
-    public static CurrentTripSummaryResponse of(ActualRoute route, long pingCount, List<String> visitedPlaceNames) {
+    // 👈 새로 추가: visitedPlaceNames 중 앞에서부터 몇 개가 실제로 confirm(visitTime 등록)된
+    // 핑인지. 홈 위젯에서 이미 찍은 핑(파란색)과 다음에 찍을 핑(포커스)을 구분해서 그리기 위함.
+    @Schema(description = "visitedPlaceNames 중 실제로 찍힌(visitTime 있는) 핑 개수 - 앞에서부터 이 개수만큼이 확정된 핑", example = "2")
+    private long confirmedCount;
+
+    // 👈 새로 추가: "내 주변 코스"를 마지막으로 찍은 핑 위치 기준으로 보여주기 위한 좌표.
+    // 아직 찍은 핑이 하나도 없으면 둘 다 null.
+    @Schema(description = "가장 최근에 찍힌 핑의 위도 (없으면 null)")
+    private Double lastPingLatitude;
+
+    @Schema(description = "가장 최근에 찍힌 핑의 경도 (없으면 null)")
+    private Double lastPingLongitude;
+
+    public static CurrentTripSummaryResponse of(
+            ActualRoute route,
+            long pingCount,
+            List<String> visitedPlaceNames,
+            long confirmedCount,
+            Double lastPingLatitude,
+            Double lastPingLongitude
+    ) {
         return CurrentTripSummaryResponse.builder()
                 .actualRouteId(route.getActualRouteId())
                 .companionType(route.getCompanionType())
@@ -52,6 +72,9 @@ public class CurrentTripSummaryResponse {
                 .status(route.getStatus())
                 .pingCount(pingCount)
                 .visitedPlaceNames(visitedPlaceNames)
+                .confirmedCount(confirmedCount)
+                .lastPingLatitude(lastPingLatitude)
+                .lastPingLongitude(lastPingLongitude)
                 .build();
     }
 }

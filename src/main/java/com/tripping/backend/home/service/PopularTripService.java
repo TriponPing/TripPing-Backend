@@ -94,7 +94,9 @@ public class PopularTripService {
                 .toList();
     }
 
-    private PopularTripResponse buildTripResponse(ActualRoute route, LocalDateTime savedCountSince) {
+    // 👈 수정: private -> package-private. NearbyTripService("내 주변 코스" = 마지막 핑 주변 코스)에서
+    // 루트 하나를 카드용 응답으로 만드는 로직을 그대로 재사용하기 위함(중복 구현 방지).
+    PopularTripResponse buildTripResponse(ActualRoute route, LocalDateTime savedCountSince) {
         List<ActualRouteSpot> spots = actualRouteSpotRepository
                 .findByActualRouteIdOrderByVisitOrderAsc(route.getActualRouteId());
         Map<Long, TouristSpot> spotById = touristSpotRepository
@@ -102,14 +104,15 @@ public class PopularTripService {
                 .stream()
                 .collect(java.util.stream.Collectors.toMap(TouristSpot::getSpotId, s -> s));
 
-        List<String> stopNames = spots.stream()
+        List<TouristSpot> touristSpots = spots.stream()
                 .map(s -> spotById.get(s.getSpotId()))
                 .filter(s -> s != null)
+                .toList();
+
+        List<String> stopNames = touristSpots.stream()
                 .map(TouristSpot::getName)
                 .toList();
-        String photoUrl = spots.stream()
-                .map(s -> spotById.get(s.getSpotId()))
-                .filter(s -> s != null)
+        String photoUrl = touristSpots.stream()
                 .map(TouristSpot::getImageUrl)
                 .filter(url -> url != null && !url.isBlank())
                 .findFirst()
@@ -131,7 +134,8 @@ public class PopularTripService {
                 stopNames,
                 photoUrl,
                 spots.size(),
-                coordinates);
+                coordinates,
+                determineTheme(touristSpots));
     }
 
     /** 지금은 "week"만 지원합니다. 다른 period(예: month, all)가 필요해지면 여기만 확장하면 됩니다. */
@@ -143,6 +147,32 @@ public class PopularTripService {
         return userRepository.findById(userId)
                 .map(AppUser::getNickname)
                 .orElse(UNKNOWN_NICKNAME);
+    }
+
+    // TouristSpotService.determineTheme() / RouteRecommendService.determineTheme()랑 같은 로직
+    // (카테고리 비율로 테마명 결정). 루트 자체엔 제목이 없어서 상세보기 제목으로 씀.
+    private String determineTheme(List<TouristSpot> spots) {
+        Map<String, Long> categoryCount = spots.stream()
+                .collect(Collectors.groupingBy(TouristSpot::getCategory, Collectors.counting()));
+
+        String topCategory = categoryCount.entrySet().stream()
+                .max(Map.Entry.comparingByValue())
+                .map(Map.Entry::getKey)
+                .orElse("");
+
+        long topCount = categoryCount.getOrDefault(topCategory, 0L);
+        boolean isEvenlyMixed = categoryCount.size() > 1 && topCount <= spots.size() / 2.0;
+
+        if (isEvenlyMixed) {
+            return "종합 나들이 루트";
+        }
+
+        return switch (topCategory) {
+            case "attraction" -> "역사탐방 루트";
+            case "restaurant" -> "맛집투어 루트";
+            case "cafe" -> "카페투어 루트";
+            default -> "종합 나들이 루트";
+        };
     }
 
     public TripDetailResponse getTripDetail(Long routeId) {
@@ -191,8 +221,14 @@ public class PopularTripService {
         LocalDateTime since = LocalDateTime.now().minusYears(100);
         long savedCount = savedRouteRepository.countRecentSavesByRouteId(routeId, since);
 
+        List<TouristSpot> touristSpots = spots.stream()
+                .map(s -> spotById.get(s.getSpotId()))
+                .filter(s -> s != null)
+                .toList();
+
         return TripDetailResponse.builder()
                 .routeId(route.getActualRouteId())
+                .title(determineTheme(touristSpots))
                 .writerNickname(writer != null ? writer.getNickname() : UNKNOWN_NICKNAME)
                 .writerProfileImage(writer != null ? writer.getProfileImage() : null)
                 // 👈 수정: level을 AppUser에서 직접 읽던 것 -> 총 핑 개수 기준으로 계산 (이유는 AppUser 주석 참고)

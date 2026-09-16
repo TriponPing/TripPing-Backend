@@ -2,6 +2,7 @@ package com.tripping.backend.home.service;
 
 import com.tripping.backend.entity.TouristSpot;
 import com.tripping.backend.home.dto.response.PopularPlaceResponse;
+import com.tripping.backend.home.repository.HomeActualRouteSpotRepository;
 import com.tripping.backend.home.repository.HomeSavedPlaceRepository;
 import com.tripping.backend.home.repository.HomeTouristSpotRepository;
 import java.time.LocalDateTime;
@@ -23,6 +24,8 @@ public class PopularPlaceService {
 
     private final HomeSavedPlaceRepository savedPlaceRepository;
     private final HomeTouristSpotRepository touristSpotRepository;
+    // 👈 새로 추가: 카드 사진을 자리별 고정 이미지 대신, 저장 많이 된 루트의 이 장소 후기 사진으로 채우기 위함
+    private final HomeActualRouteSpotRepository actualRouteSpotRepository;
 
     /** 저장 수가 같은 값끼리는(동점) 순서 안에 같이 포함시키는 게 목적이라, 정렬만 하고 별도 중복 제거는 하지 않습니다. */
     public List<PopularPlaceResponse> getPopularPlaces(int limit) {
@@ -43,7 +46,8 @@ public class PopularPlaceService {
                 .filter(spot -> spot != null)
                 .map(spot -> PopularPlaceResponse.of(
                         spot,
-                        savedPlaceRepository.countRecentSavesBySpotId(spot.getSpotId(), since)))
+                        savedPlaceRepository.countRecentSavesBySpotId(spot.getSpotId(), since),
+                        actualRouteSpotRepository.findBestReviewPhotoUrlBySpotId(spot.getSpotId())))
                 .toList();
     }
 

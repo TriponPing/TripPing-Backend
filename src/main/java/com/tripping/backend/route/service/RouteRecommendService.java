@@ -29,8 +29,13 @@ public class RouteRecommendService {
                 .filter(spot -> !excludeIds.contains(spot.getSpotId()))
                 .toList();
 
+        // 👈 수정: 예전엔 여기서 그냥 에러(500)를 던져서, 프론트가 그걸 못 받아서 "다음" 눌러도
+        // 화면이 그대로 멈춰있는 것처럼 보였음. 장소가 부족한 건 버그가 아니라 "그 지역/조건에
+        // 데이터가 아직 부족한" 정상적인 상황이므로, 에러 대신 빈 목록을 내려줌 - 프론트는 빈 목록을
+        // 받으면 "추천할 장소가 부족해요" 안내를 보여주고 수동으로 루트를 만들 수 있는 다음 단계로
+        // 그대로 넘어감.
         if (candidates.size() < 2) {
-            throw new IllegalArgumentException("추천 가능한 장소가 부족합니다. 지역 또는 제외 조건을 확인해주세요.");
+            return List.of();
         }
 
         // 3. 꼭 가고 싶은 장소들 (후보군 안에서)

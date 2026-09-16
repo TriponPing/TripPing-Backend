@@ -121,8 +121,23 @@ public class TouristSpotService {
         List<HomeActualRouteSpotRepository.SpotReviewProjection> reviewRows =
                 actualRouteSpotRepository.findReviewsBySpotId(spotId);
         List<SpotReviewResponse> reviews = reviewRows.stream()
-                .map(r -> new SpotReviewResponse(r.getWriterNickname(), r.getRating(), r.getReviewComment()))
+                .map(r -> new SpotReviewResponse(
+                        r.getWriterNickname(),
+                        r.getRating(),
+                        r.getReviewComment(),
+                        r.getPhotoUrl(),
+                        r.getCreatedAt()
+                ))
                 .toList();
+
+        // 장소 상세 화면(로그 상세보기 등)에 표시할 평균 별점/리뷰 개수 - 별점 있는 후기 기준
+        List<Integer> ratings = reviews.stream()
+                .map(SpotReviewResponse::getRating)
+                .filter(r -> r != null)
+                .toList();
+        Double averageRating = ratings.isEmpty()
+                ? null
+                : ratings.stream().mapToInt(Integer::intValue).average().orElse(0.0);
 
         return SpotDetailResponse.builder()
                 .spotId(spot.getSpotId())
@@ -135,6 +150,8 @@ public class TouristSpotService {
                 .popularTimeSlot(stats.popularTimeSlot())
                 .registeredRoutes(registeredRoutes)
                 .reviews(reviews)
+                .averageRating(averageRating)
+                .reviewCount(reviews.size())
                 .build();
     }
 
@@ -201,6 +218,7 @@ public class TouristSpotService {
                 .category(request.category())
                 .latitude(request.latitude())
                 .longitude(request.longitude())
+                .regionId(request.regionId())
                 .createdByUserId(userId)
                 .build();
 

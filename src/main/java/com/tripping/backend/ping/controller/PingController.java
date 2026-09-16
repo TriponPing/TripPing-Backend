@@ -3,9 +3,11 @@ package com.tripping.backend.ping.controller;
 import com.tripping.backend.auth.service.CustomUserDetails;
 import com.tripping.backend.ping.dto.AddTripSpotRequest;
 import com.tripping.backend.ping.dto.AddTripSpotResponse;
+import com.tripping.backend.ping.dto.ConfirmNextPingResponse;
 import com.tripping.backend.ping.dto.OngoingTripResponse;
 import com.tripping.backend.ping.dto.PingRegisterRequest;
 import com.tripping.backend.ping.dto.PingResponse;
+import com.tripping.backend.ping.dto.ReorderTripSpotsRequest;
 import com.tripping.backend.ping.dto.SpotPingStatsResponse;
 import com.tripping.backend.ping.service.PingService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -82,6 +84,31 @@ public class PingController {
     ) {
         requireLogin(userDetails);
         pingService.deleteSpotFromTrip(userDetails.getUserId(), routeId, actualRouteSpotId);
+        return ResponseEntity.noContent().build();
+    }
+
+    // 👈 새로 추가: 계획된 순서대로 다음 핑 찍기 (큐)
+    @Operation(summary = "다음 핑 찍기", description = "진행 중인 여행에서 계획된 방문 순서상 다음 장소 하나를 핑으로 확정합니다.")
+    @PostMapping("/routes/{routeId}/pings/next")
+    public ResponseEntity<ConfirmNextPingResponse> confirmNextPing(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long routeId
+    ) {
+        requireLogin(userDetails);
+        ConfirmNextPingResponse response = pingService.confirmNextPing(userDetails.getUserId(), routeId);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    // 👈 새로 추가: 여행 기록(방문 스팟) 순서 변경 - 꾹 눌러 드래그로 재정렬한 새 순서 저장
+    @Operation(summary = "여행 기록 순서 변경", description = "핑 기록(ACTUAL_ROUTE_SPOT)의 방문 순서를 드래그로 재정렬한 새 순서로 저장합니다.")
+    @PatchMapping("/trips/{routeId}/spots/order")
+    public ResponseEntity<Void> reorderTripSpots(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long routeId,
+            @Valid @RequestBody ReorderTripSpotsRequest request
+    ) {
+        requireLogin(userDetails);
+        pingService.reorderTripSpots(userDetails.getUserId(), routeId, request);
         return ResponseEntity.noContent().build();
     }
 

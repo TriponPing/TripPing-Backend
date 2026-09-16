@@ -7,9 +7,11 @@ import com.tripping.backend.entity.TouristSpot;
 import com.tripping.backend.entity.WidgetPing;
 import com.tripping.backend.ping.dto.AddTripSpotRequest;
 import com.tripping.backend.ping.dto.AddTripSpotResponse;
+import com.tripping.backend.ping.dto.ConfirmNextPingResponse;
 import com.tripping.backend.ping.dto.OngoingTripResponse;
 import com.tripping.backend.ping.dto.PingRegisterRequest;
 import com.tripping.backend.ping.dto.PingResponse;
+import com.tripping.backend.ping.dto.ReorderTripSpotsRequest;
 import com.tripping.backend.ping.dto.SpotPingStatsResponse;
 import com.tripping.backend.ping.repository.PingActualRouteRepository;
 import com.tripping.backend.ping.repository.PingActualRouteSpotRepository;
@@ -23,6 +25,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -117,6 +121,70 @@ public class PingService {
                 ts != null ? ts.getLongitude() : null,
                 saved.getVisitTime()
         );
+    }
+
+    // 👈 새로 추가: "다음 핑 찍기" - Ping 탭 "+"/홈 "Ping 찍기"가 매번 장소를 검색해서 고르는 대신,
+    // 계획된 방문 순서(visit_order)대로 큐처럼 다음 장소 하나를 자동으로 확정(visit_time 채움)함.
+    // ActualRouteSpot은 여행 시작(createTrip) 시점에 계획된 전체 일정이 이미 다 만들어져 있고
+    // visit_time만 비어있는 상태라, 그 중 visit_time이 비어있는 것 중 순서가 가장 빠른 걸 확정하면 됨.
+    @Transactional
+    public ConfirmNextPingResponse confirmNextPing(Long userId, Long routeId) {
+        ActualRoute route = findOwnedRoute(userId, routeId);
+        if (route.getStatus() != RouteStatus.IN_PROGRESS) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "진행 중인 여행에만 핑을 찍을 수 있습니다.");
+        }
+
+        List<ActualRouteSpot> pending = actualRouteSpotRepository
+                .findByActualRouteIdAndVisitTimeIsNullOrderByVisitOrderAsc(routeId);
+
+        if (pending.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "찍을 수 있는 다음 장소가 없어요. 계획된 장소를 모두 찍었어요.");
+        }
+
+        ActualRouteSpot next = pending.get(0);
+        next.setVisitTime(LocalDateTime.now());
+        ActualRouteSpot saved = actualRouteSpotRepository.save(next);
+
+        TouristSpot spot = touristSpotRepository.findById(saved.getSpotId()).orElse(null);
+
+        boolean hasNext = pending.size() > 1;
+        String nextSpotName = null;
+        if (hasNext) {
+            TouristSpot nextSpot = touristSpotRepository.findById(pending.get(1).getSpotId()).orElse(null);
+            nextSpotName = nextSpot != null ? nextSpot.getName() : null;
+        }
+
+        return new ConfirmNextPingResponse(
+                saved.getActualRouteSpotId(),
+                saved.getVisitOrder(),
+                saved.getSpotId(),
+                spot != null ? spot.getName() : null,
+                saved.getVisitTime(),
+                hasNext,
+                nextSpotName
+        );
+    }
+
+    // 👈 새로 추가: Ping "기록" 탭에서 꾹 눌러 드래그한 새 순서를 통째로 저장 - PATCH /trips/{routeId}/spots/order
+    @Transactional
+    public void reorderTripSpots(Long userId, Long routeId, ReorderTripSpotsRequest request) {
+        findOwnedRoute(userId, routeId); // 소유권 검증
+
+        List<ActualRouteSpot> spots = actualRouteSpotRepository.findByActualRouteIdOrderByVisitOrderAsc(routeId);
+        Map<Long, ActualRouteSpot> spotById = spots.stream()
+                .collect(Collectors.toMap(ActualRouteSpot::getActualRouteSpotId, s -> s));
+
+        List<Long> newOrder = request.actualRouteSpotIds();
+        boolean sameSet = newOrder.size() == spots.size() && spotById.keySet().containsAll(newOrder);
+        if (!sameSet) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "요청한 목록이 이 여행의 방문 기록과 일치하지 않습니다.");
+        }
+
+        for (int i = 0; i < newOrder.size(); i++) {
+            ActualRouteSpot spot = spotById.get(newOrder.get(i));
+            spot.setVisitOrder(i + 1);
+            actualRouteSpotRepository.save(spot);
+        }
     }
 
     // 여행 기록(방문 스팟)에서 하나 삭제 - DELETE /trips/{routeId}/spots/{actualRouteSpotId}

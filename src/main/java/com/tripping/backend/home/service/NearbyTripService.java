@@ -1,13 +1,12 @@
 package com.tripping.backend.home.service;
 
-import com.tripping.backend.auth.repository.UserRepository;
 import com.tripping.backend.entity.ActualRoute;
-import com.tripping.backend.entity.AppUser;
-import com.tripping.backend.home.dto.response.NearbyTripResponse;
+import com.tripping.backend.home.dto.response.PopularTripResponse;
 import com.tripping.backend.home.repository.HomeActualRouteRepository;
 import com.tripping.backend.home.repository.HomeActualRouteSpotRepository;
 import com.tripping.backend.home.repository.NearbyRouteProjection;
 import com.tripping.backend.mypage.dto.PageResponse;
+import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,16 +22,17 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class NearbyTripService {
 
-    private static final String UNKNOWN_NICKNAME = "알 수 없음";
-
     /** 기본 반경(km). 프론트에서 radiusKm 을 안 보내면 이 값을 씁니다. */
     public static final double DEFAULT_RADIUS_KM = 10.0;
 
     private final HomeActualRouteSpotRepository actualRouteSpotRepository;
     private final HomeActualRouteRepository actualRouteRepository;
-    private final UserRepository userRepository; // auth 도메인의 AppUser Repository를 그대로 재사용합니다.
+    // 👈 수정: 카드 하나를 채우는 로직(작성자/스탑목록/사진/저장수/테마명)이 "이번 주 인기 루트"와
+    // 완전히 같아서(거리만 추가) NearbyTripResponse를 따로 안 쓰고 PopularTripService.buildTripResponse()를
+    // 재사용함 - PopularTripResponse에 distanceKm을 nullable로 추가해서 같은 DTO를 공유함.
+    private final PopularTripService popularTripService;
 
-    public PageResponse<NearbyTripResponse> getNearbyTrips(
+    public PageResponse<PopularTripResponse> getNearbyTrips(
             double lat, double lng, Double radiusKm, int page, int size) {
         double effectiveRadiusKm = (radiusKm != null) ? radiusKm : DEFAULT_RADIUS_KM;
         Pageable pageable = PageRequest.of(page, size);
@@ -53,24 +53,23 @@ public class NearbyTripService {
         actualRouteRepository.findByActualRouteIdInAndIsPublicTrueAndIsDeletedFalse(routeIds)
                 .forEach(route -> routeById.put(route.getActualRouteId(), route));
 
-        List<NearbyTripResponse> content = nearbyPage.getContent().stream()
+        // "저장수" 표시는 전체 기간 기준 (내 주변 코스는 "이번주"처럼 기간 한정 리스트가 아니라서
+        // getTripDetail()과 동일하게 넓은 기간을 씀 - 진짜 전체 카운트 메서드 생기면 교체)
+        LocalDateTime savedCountSince = LocalDateTime.now().minusYears(100);
+
+        List<PopularTripResponse> content = nearbyPage.getContent().stream()
                 .map(projection -> {
                     ActualRoute route = routeById.get(projection.getActualRouteId());
                     if (route == null) {
                         return null;
                     }
-                    String nickname = findNickname(route.getUserId());
-                    return NearbyTripResponse.from(route, nickname, projection.getDistanceKm());
+                    return popularTripService.buildTripResponse(route, savedCountSince).toBuilder()
+                            .distanceKm(projection.getDistanceKm())
+                            .build();
                 })
                 .filter(response -> response != null)
                 .toList();
 
         return PageResponse.of(content, nearbyPage);
-    }
-
-    private String findNickname(Long userId) {
-        return userRepository.findById(userId)
-                .map(AppUser::getNickname)
-                .orElse(UNKNOWN_NICKNAME);
     }
 }

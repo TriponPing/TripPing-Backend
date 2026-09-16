@@ -27,7 +27,11 @@ public class RegionPing {
     @Column(nullable = false)
     private Integer rating;
 
-    @Lob
+    // 👈 수정: @Lob 제거 - TouristSpot.description과 완전히 같은 이유(그쪽 주석 참고)로
+    // oid(Large Object)에 걸려 이 지역핑 후기를 읽거나 쓸 때마다 같은 에러가 날 상태였음.
+    // 컬럼명도 같은 이유로 review_comment_text로 새로 바꿔서 Hibernate가 깨끗한 CREATE로
+    // text 타입을 새로 만들게 함 (ALTER로는 oid에서 안전하게 못 돌아옴).
+    @Column(name = "review_comment_text", columnDefinition = "text")
     private String reviewComment;
 
     @Column(name = "created_at", nullable = false, updatable = false)

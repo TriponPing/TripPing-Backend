@@ -1,6 +1,5 @@
 package com.tripping.backend.home.controller;
 
-import com.tripping.backend.home.dto.response.NearbyTripResponse;
 import com.tripping.backend.home.dto.response.PopularTripResponse;
 import com.tripping.backend.home.service.NearbyTripService;
 import com.tripping.backend.home.service.PopularTripService;
@@ -40,9 +39,9 @@ public class HomeTripController {
         return ResponseEntity.ok(popularTripService.getPopularTrips(period, limit));
     }
 
-    @Operation(summary = "내 주변 여행 조회", description = "실제 방문 GPS 기준으로 현재 위치에서 가까운 공개 루트를 거리순으로 조회합니다.")
+    @Operation(summary = "내 주변 여행 조회", description = "기준 좌표(진행 중인 여행이 있으면 마지막으로 찍은 핑, 없으면 현재 위치)에서 가까운 공개 루트를 거리순으로 조회합니다.")
     @GetMapping("/nearby")
-    public ResponseEntity<PageResponse<NearbyTripResponse>> getNearbyTrips(
+    public ResponseEntity<PageResponse<PopularTripResponse>> getNearbyTrips(
             @RequestParam double lat,
             @RequestParam double lng,
             @RequestParam(required = false) Double radiusKm,

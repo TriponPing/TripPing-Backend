@@ -53,6 +53,15 @@ public class PopularTripResponse {
     @Builder.Default
     private List<String> tags = List.of();
 
+    // 👈 새로 추가: TripDetailResponse.title과 같은 방식(determineTheme)으로 계산한 테마 이름.
+    // "내 주변 코스"(마지막 핑 주변) 카드에서 코스 이름으로 씀.
+    @Schema(description = "방문 장소 카테고리로 즉석 계산한 테마 이름", example = "카페투어 루트")
+    private String title;
+
+    // 👈 새로 추가: "내 주변 코스"에서만 채워짐 (기준 좌표로부터의 거리). 그 외 용도(인기 루트 등)에서는 null.
+    @Schema(description = "기준 좌표(마지막 핑 등)로부터의 거리(km). 인기 루트 등 거리 무관 용도에서는 null")
+    private Double distanceKm;
+
     public static PopularTripResponse from(
             ActualRoute route,
             String writerNickname,
@@ -60,7 +69,8 @@ public class PopularTripResponse {
             List<String> stopNames,
             String photoUrl,
             long pingCount,
-            List<CoordinateResponse> coordinates
+            List<CoordinateResponse> coordinates,
+            String title
     ) {
         return PopularTripResponse.builder()
                 .routeId(route.getActualRouteId())
@@ -75,6 +85,7 @@ public class PopularTripResponse {
                 .photoUrl(photoUrl)
                 .pingCount(pingCount)
                 .coordinates(coordinates)
+                .title(title)
                 .build();
     }
 }

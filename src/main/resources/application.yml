@@ -1,4 +1,7 @@
 server:
+  # 👈 새로 추가: Railway/Render 등 대부분의 호스팅은 컨테이너에 PORT 환경변수로 포트를 지정해줌.
+  # 이 값이 없으면(로컬 실행) 그냥 8080을 씀 - 로컬/배포 둘 다 그대로 동작.
+  port: ${PORT:8080}
   tomcat:
     uri-encoding: UTF-8
 
@@ -18,7 +21,17 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
     show-sql: true
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
 
+# 👈 새로 추가: Ping 후기 사진 업로드 저장 위치 (로컬 디스크). 클라우드 스토리지(S3 등)가 아직
+# 안 붙어있어서 서버 로컬에 저장하고 /uploads/{filename}으로 서빙함 - 개발/로컬 테스트용.
+# 나중에 배포 시엔 이 값을 영구 디스크 경로로 바꾸거나 S3 등으로 교체해야 함(서버 재배포하면
+# 로컬 디스크 파일은 날아감).
+app:
+  upload-dir: uploads
 
 tour-api:
   service-key: VSRjuqr0bQ8H3qPSxevdKSdZK/6gYpdKUlS2cBeQvfo66fPUaEzbG+eoCoPelUKDsa2nZBQtHM72Hx21FlVn2A==

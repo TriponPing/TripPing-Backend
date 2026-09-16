@@ -25,13 +25,19 @@ public class PopularPlaceResponse {
     @Schema(description = "이번 주 저장(찜) 수", example = "33")
     private long savedCount;
 
-    public static PopularPlaceResponse of(TouristSpot spot, long savedCount) {
+    // 👈 새로 추가: 이 장소 후기 중 저장 많이 된 루트의 사진을 우선으로 골라서 내려줌.
+    // 사진 등록된 후기가 하나도 없으면 null (프론트는 이때 자리별 고정 이미지로 대체함).
+    @Schema(description = "저장 수 많은 루트의 이 장소 후기 사진 (없으면 null)")
+    private String photoUrl;
+
+    public static PopularPlaceResponse of(TouristSpot spot, long savedCount, String photoUrl) {
         return PopularPlaceResponse.builder()
                 .spotId(spot.getSpotId())
                 .name(spot.getName())
                 .category(spot.getCategory())
                 .address(spot.getAddress())
                 .savedCount(savedCount)
+                .photoUrl(photoUrl)
                 .build();
     }
 }
