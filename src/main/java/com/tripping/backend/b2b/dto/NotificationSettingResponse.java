@@ -9,13 +9,11 @@ import lombok.Getter;
 public class NotificationSettingResponse {
     private Boolean notifyTrend;
     private Boolean notifyReport;
-    private Boolean notifyWeekly;
 
     public static NotificationSettingResponse from(OrgNotificationSetting setting) {
         return NotificationSettingResponse.builder()
                 .notifyTrend(setting.getNotifyTrend())
                 .notifyReport(setting.getNotifyReport())
-                .notifyWeekly(setting.getNotifyWeekly())
                 .build();
     }
 }

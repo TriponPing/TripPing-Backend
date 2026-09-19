@@ -10,5 +10,4 @@ import lombok.Setter;
 public class NotificationSettingUpdateRequest {
     private Boolean notifyTrend;
     private Boolean notifyReport;
-    private Boolean notifyWeekly;
 }

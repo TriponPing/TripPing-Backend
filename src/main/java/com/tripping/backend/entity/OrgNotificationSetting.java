@@ -31,7 +31,9 @@ public class OrgNotificationSetting {
     @Column(name = "notify_report", nullable = false)
     private Boolean notifyReport = true;
 
-    // 매주 지난주 방문 추이 메일
+    // 주간 요약 메일은 없앴지만 컬럼은 NOT NULL로 이미 만들어져 있다.
+    // 필드를 지우면 INSERT에서 이 컬럼이 빠져 제약에 걸리므로 매핑만 남긴다.
+    // 컬럼을 정리하려면 별도 마이그레이션이 필요하다.
     @Builder.Default
     @Column(name = "notify_weekly", nullable = false)
     private Boolean notifyWeekly = false;
