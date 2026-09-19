@@ -37,6 +37,17 @@ public class Organization {
     @Column(name = "document_url", length = 500)
     private String documentUrl;
 
+    // 👈 추가: 조직 설정 화면에서 기관이 직접 채우는 항목. 접근 신청 때는 받지 않으므로
+    // 가입 직후엔 비어 있다. 로고는 documentUrl과 같은 이유로 URL만 저장한다.
+    @Column(length = 100)
+    private String department;
+
+    @Column(length = 500)
+    private String description;
+
+    @Column(name = "logo_url", length = 500)
+    private String logoUrl;
+
     @Enumerated(EnumType.STRING)
     @Builder.Default
     private OrgStatus status = OrgStatus.PENDING;
