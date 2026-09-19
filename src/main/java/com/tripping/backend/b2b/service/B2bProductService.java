@@ -165,6 +165,8 @@ public class B2bProductService {
                             .spotId(row.getSpotId())
                             .name(spot == null ? null : spot.getName())
                             .address(spot == null ? null : spot.getAddress())
+                            .latitude(spot == null ? null : spot.getLatitude())
+                            .longitude(spot == null ? null : spot.getLongitude())
                             .visitOrder(row.getVisitOrder())
                             .stayDuration(row.getStayDuration())
                             .build();
