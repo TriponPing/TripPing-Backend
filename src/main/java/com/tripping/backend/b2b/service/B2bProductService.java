@@ -89,6 +89,8 @@ public class B2bProductService {
         if (request.getMealIncluded() != null) product.setMealIncluded(request.getMealIncluded());
         if (request.getTrendBasis() != null) product.setTrendBasis(request.getTrendBasis());
         if (request.getCautionNotes() != null) product.setCautionNotes(request.getCautionNotes());
+        if (request.getDescription() != null) product.setDescription(request.getDescription());
+        if (request.getPrice() != null) product.setPrice(request.getPrice());
 
         if (request.getSpots() != null) replaceSpots(productId, request.getSpots());
         if (request.getHashtags() != null) replaceHashtags(productId, request.getHashtags());

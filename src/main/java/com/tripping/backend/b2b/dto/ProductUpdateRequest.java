@@ -20,6 +20,8 @@ public class ProductUpdateRequest {
     private String transport;
     private Boolean mealIncluded;
     private String trendBasis;
+    private String description;
+    private Integer price;
     private String cautionNotes;
     private List<ProductSpotRequest> spots;
     private List<String> hashtags;

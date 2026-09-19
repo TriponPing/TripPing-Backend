@@ -7,8 +7,6 @@ import lombok.Getter;
 import java.time.LocalDateTime;
 import java.util.List;
 
-// tour_product에 가격 컬럼이 없어 판매가는 내려가지 않는다. 회의록은 가격을
-// 요구하므로 컬럼 추가 여부가 정해지면 여기에 같이 싣는다.
 @Getter
 @Builder
 public class ProductDetailResponse {
@@ -22,6 +20,8 @@ public class ProductDetailResponse {
     private String transport;
     private Boolean mealIncluded;
     private String trendBasis;
+    private String description;
+    private Integer price;
     private String cautionNotes;
     private List<ProductSpotResponse> spots;
     private List<String> hashtags;
@@ -41,6 +41,8 @@ public class ProductDetailResponse {
                 .transport(product.getTransport())
                 .mealIncluded(product.getMealIncluded())
                 .trendBasis(product.getTrendBasis())
+                .description(product.getDescription())
+                .price(product.getPrice())
                 .cautionNotes(product.getCautionNotes())
                 .spots(spots)
                 .hashtags(hashtags)

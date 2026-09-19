@@ -14,6 +14,7 @@ public class ProductSummaryResponse {
     private String status;
     private String regionId;
     private String regionName;
+    private Integer price;
     private int spotCount;
     private LocalDateTime updatedAt;
     private LocalDateTime createdAt;
@@ -25,6 +26,7 @@ public class ProductSummaryResponse {
                 .status(product.getStatus())
                 .regionId(product.getRegionId())
                 .regionName(regionName)
+                .price(product.getPrice())
                 .spotCount(spotCount)
                 .updatedAt(product.getUpdatedAt())
                 .createdAt(product.getCreatedAt())
