@@ -63,7 +63,6 @@ public class B2bOrganizationService {
 
         if (request.getNotifyTrend() != null) setting.setNotifyTrend(request.getNotifyTrend());
         if (request.getNotifyReport() != null) setting.setNotifyReport(request.getNotifyReport());
-        if (request.getNotifyWeekly() != null) setting.setNotifyWeekly(request.getNotifyWeekly());
 
         notificationRepository.save(setting);
         return NotificationSettingResponse.from(setting);
