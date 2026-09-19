@@ -27,6 +27,9 @@ public class SecurityConfig {
     // 로그인이나 회원가입처럼, 로그인을 안 한 상태에서도 접근할 수 있어야 하는 URL 목록
     private static final String[] ALLOW_LIST = {
             "/auth/join", "/auth/login",
+            // 👈 추가: TripPing-Web(B2B 포털) 쪽 접근 신청/로그인도 로그인 전 상태에서
+            // 호출되므로 여기 열어둬야 함. 앱의 /auth/* 와는 완전히 별도 경로.
+            "/b2b/auth/join", "/b2b/auth/login",
             "/places/**", "/map/places/**",   // 테스트용으로 임시 추가
             "/routes/map/search",
             "/regions" // 회원가입(사는 지역 선택) 화면은 로그인 전이라 전체 지역 목록 조회는 열어둬야 함
@@ -66,6 +69,10 @@ public class SecurityConfig {
                         // 이미지 <img> 요청처럼 매번 세션 쿠키를 기대하기 어려워서. 업로드(POST)는
                         // 아래 anyRequest().authenticated()에 걸려 그대로 로그인 필요함.
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/uploads/**").permitAll()
+                        // 👈 추가: 기관 접근 신청 승인/반려는 운영자(ROLE_ADMIN)만 가능.
+                        // B2bAuthService에서 로그인 시 Admin이면 ROLE_ADMIN, Organization이면
+                        // ROLE_ORG 권한을 부여하므로 여기서 구분해서 막는다.
+                        .requestMatchers("/b2b/admin/**").hasAuthority("ROLE_ADMIN")
                         .anyRequest().authenticated() // 그 외의 모든 요청은 반드시 로그인이 필요함
                 )
                 .formLogin(form -> form.disable()) // 기본 제공되는 HTML 폼 로그인 화면 비활성화 (우리가 직접만든 AuthController 사용)

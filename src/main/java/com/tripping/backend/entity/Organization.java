@@ -31,6 +31,12 @@ public class Organization {
     @Column(nullable = false, length = 255)
     private String password;
 
+    // 👈 추가: 접근 신청 시 제출하는 재직/기관 증빙파일 URL. AppUser.profileImage 때와 같은
+    // base64 컬럼 버그(oid 문제, 주석 참고)를 피하려고 base64로 직접 저장하지 않고
+    // FileUploadController로 먼저 업로드해서 받은 URL 문자열만 저장한다.
+    @Column(name = "document_url", length = 500)
+    private String documentUrl;
+
     @Enumerated(EnumType.STRING)
     @Builder.Default
     private OrgStatus status = OrgStatus.PENDING;
