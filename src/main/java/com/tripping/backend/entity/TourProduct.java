@@ -43,6 +43,16 @@ public class TourProduct {
     @Column(name = "caution_notes", length = 255)
     private String cautionNotes;
 
+    // 👈 추가: 기획 화면의 상품 소개 글. trendBasis(트렌드 근거)와 용도가 달라
+    // 따로 둔다. 길이도 255로는 부족하다.
+    @Column(length = 1000)
+    private String description;
+
+    // 👈 추가: 판매가(원). 회의록의 "상세 설정 (가격·기간·타겟)" 항목이다.
+    // 아직 정하지 않은 초안이 많아 null을 허용한다.
+    @Column
+    private Integer price;
+
     @Builder.Default
     @Column(length = 20)
     private String status = "DRAFT";
