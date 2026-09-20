@@ -1,13 +1,16 @@
 package com.tripping.backend.insight.service;
 
+import com.tripping.backend.insight.dto.DailyVisitResponse;
 import com.tripping.backend.insight.dto.RouteRankingResponse;
 import com.tripping.backend.insight.dto.TrendsSummaryResponse;
+import com.tripping.backend.insight.repository.DailyVisitProjection;
 import com.tripping.backend.insight.repository.InsightRouteRepository;
 import com.tripping.backend.insight.repository.RouteCountProjection;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -50,6 +53,24 @@ public class InsightService {
                 })
                 .sorted(Comparator.comparingLong(RouteRankingResponse::getVisitCount).reversed())
                 .toList();
+    }
+
+    // "일자별 이동량" 차트용 - summary()와 같은 DateRange.forPeriod()로 기간을 구하지만,
+    // 직전 기간과 비교하지 않고 선택한 기간 안의 날짜별 건수만 반환한다.
+    // 방문 기록이 없는 날짜도 차트에서 끊기지 않도록 0건으로 채워서 모든 날짜를 다 내려준다.
+    public List<DailyVisitResponse> dailyVisits(String period, String region) {
+        DateRange current = DateRange.forPeriod(period, LocalDate.now());
+        String regionName = normalizeRegion(region);
+
+        List<DailyVisitProjection> rows = insightRouteRepository.countVisitsByDay(current.start(), current.end(), regionName);
+        Map<LocalDate, Long> countsByDate = rows.stream()
+                .collect(Collectors.toMap(DailyVisitProjection::getVisitDate, DailyVisitProjection::getVisitCount));
+
+        List<DailyVisitResponse> result = new ArrayList<>();
+        for (LocalDate date = current.start(); !date.isAfter(current.end()); date = date.plusDays(1)) {
+            result.add(new DailyVisitResponse(date, countsByDate.getOrDefault(date, 0L)));
+        }
+        return result;
     }
 
     // 프론트의 "전체 지역"은 지역 필터 없음(null)으로 취급.

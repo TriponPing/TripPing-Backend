@@ -1,5 +1,6 @@
 package com.tripping.backend.insight.controller;
 
+import com.tripping.backend.insight.dto.DailyVisitResponse;
 import com.tripping.backend.insight.dto.RouteRankingResponse;
 import com.tripping.backend.insight.dto.TrendsSummaryResponse;
 import com.tripping.backend.insight.service.InsightService;
@@ -42,5 +43,17 @@ public class InsightController {
             @Parameter(description = "지역명. \"전체 지역\"이면 필터 없음")
             @RequestParam(defaultValue = "전체 지역") String region) {
         return ResponseEntity.ok(insightService.risingRoutes(period, region));
+    }
+
+    // [일자별 이동량] GET /b2b/insight/trends/daily?period=최근 30일&region=전체 지역
+    // summary()의 "총 방문 핑"과 완전히 같은 집계 기준(스팟 체크인 수)을 날짜별로 쪼갠 것.
+    @Operation(summary = "일자별 방문 핑(이동량) 추이 조회", description = "선택한 기간 안의 날짜별 방문 핑 수. 방문 기록이 없는 날짜는 0으로 채워서 반환한다.")
+    @GetMapping("/trends/daily")
+    public ResponseEntity<List<DailyVisitResponse>> daily(
+            @Parameter(description = "\"최근 7일\" / \"최근 30일\" / \"최근 1년\"")
+            @RequestParam(defaultValue = "최근 30일") String period,
+            @Parameter(description = "지역명. \"전체 지역\"이면 필터 없음")
+            @RequestParam(defaultValue = "전체 지역") String region) {
+        return ResponseEntity.ok(insightService.dailyVisits(period, region));
     }
 }
