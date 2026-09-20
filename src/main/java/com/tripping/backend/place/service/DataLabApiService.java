@@ -2,6 +2,7 @@ package com.tripping.backend.place.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.tripping.backend.global.config.CacheConfig;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -14,13 +15,30 @@ import java.util.TreeMap;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 // 한국관광공사 "관광 빅데이터 - 지역별 방문자수(DataLabService)" 연동.
-// TourApiService와 마찬가지로 tour-api.service-key(디코딩 버전)를 그대로 재사용한다 -
-// data.go.kr은 계정 단위로 키가 하나라, 관광공사(B551011) 산하 API는 활용신청만 승인되면
-// 전부 같은 키로 호출 가능.
+// TourApiService와 마찬가지로 data-lab-api.service-key(디코딩 버전)를 그대로 사용한다.
+//
+// 👈 중요 1: metcoRegnVisitrDDList 오퍼레이션은 공식 매뉴얼상 요청 파라미터에 지역 필터가
+// 아예 없다 (numOfRows/pageNo/MobileOS/MobileApp/serviceKey/_type/startYmd/endYmd 뿐).
+// 즉 호출할 때마다 "전국 17개 시도 × 관광객구분(현지인/외지인/외국인) 3개"가 통째로 온다.
+// 그래서 우리가 원하는 지역은 응답의 areaCode 필드로 직접 걸러내야 한다.
+// (예전엔 요청에 areaCd= 를 붙였는데, 이건 API가 받지도 않는 파라미터라 에러 응답이 왔고,
+// 그 에러 응답을 "데이터 없음"으로 조용히 처리해버려서 항상 0으로 나왔었음.)
+//
+// 👈 중요 2: 이 API 응답의 areaCode는 우리가 Region.apiAreaCd에 저장해둔 "관광공사 TourAPI
+// areaCd" 체계(서울=1, 부산=6, 대구=4 ...)가 아니라, 행정안전부 표준 시도코드 체계
+// (서울=11, 부산=26, 대구=27 ...)를 쓴다. 매뉴얼 응답 예제에 <areaCode>11</areaCode>가
+// 서울로 나와있는 걸로 확인됨. 그래서 필터링 직전에 TourAPI areaCd -> 행안부 표준코드로
+// 한 번 변환해줘야 한다.
+//
+// 👈 중요 3: 원본 데이터는 주 1회 주기로 갱신돼서 날짜가 듬성듬성하고, 최신 데이터도 약
+// 5주 지연 공개된다. 그래서 "최근 N일" 같은 최근 구간은 실측 데이터가 거의 없을 수 있다.
+// 이 서비스는 실측값(과 신뢰도를 판단할 rowCount)만 반환하고, "최근 구간을 어떻게 채울지"는
+// InsightService.regionalVisitors()에서 작년 동기 데이터 기반 추정으로 처리한다.
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -28,56 +46,130 @@ public class DataLabApiService {
 
     private static final String BASE_URL = "https://apis.data.go.kr/B551011/DataLabService";
     private static final DateTimeFormatter YMD = DateTimeFormatter.BASIC_ISO_DATE;
+    private static final int MAX_PAGES = 50; // 안전장치 - 무한루프 방지
+
+    // 관광공사 TourAPI areaCd(우리 Region.apiAreaCd) -> 행정안전부 표준 시도코드(DataLabService 응답 areaCode).
+    // ⚠️ 강원=51, 전북=52는 실제 API 응답 데이터로 검증 완료된 값. 수정하지 말 것.
+    private static final Map<String, String> TOUR_AREA_CD_TO_DATALAB_AREA_CODE = Map.ofEntries(
+            Map.entry("1", "11"),  // 서울
+            Map.entry("2", "28"),  // 인천
+            Map.entry("3", "30"),  // 대전
+            Map.entry("4", "27"),  // 대구
+            Map.entry("5", "29"),  // 광주
+            Map.entry("6", "26"),  // 부산
+            Map.entry("7", "31"),  // 울산
+            Map.entry("8", "36"),  // 세종
+            Map.entry("31", "41"), // 경기
+            Map.entry("32", "51"), // 강원
+            Map.entry("33", "43"), // 충북
+            Map.entry("34", "44"), // 충남
+            Map.entry("35", "47"), // 경북
+            Map.entry("36", "48"), // 경남
+            Map.entry("37", "52"), // 전북
+            Map.entry("38", "46"), // 전남
+            Map.entry("39", "50")  // 제주
+    );
 
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    @Value("${tour-api.service-key}")
+    @Value("${data-lab-api.service-key}")
     private String serviceKey;
 
+    // 날짜 하나에 대한 집계 결과. rowCount는 그 날짜에 실제로 합산된 touDivCd 행 개수
+    // (현지인/외지인/외국인 최대 3개)로, 3 미만이면 일부 구분값이 누락된 신뢰할 수 없는
+    // 날짜라는 뜻이다 (호출부인 InsightService에서 이 값으로 걸러낸다).
+    public record DailyVisitorAggregate(long totalVisitors, int rowCount) {
+    }
+
     /**
-     * 시도 단위(areaCd) 날짜 범위 내 일자별 총 방문자수(현지인+외지인+외국인 합산)를 조회한다.
-     * 실패하거나 데이터가 없으면 빈 Map을 반환한다 (호출부에서 0으로 취급하면 됨).
+     * 시도 단위(areaCd, 관광공사 TourAPI 체계) 날짜 범위 내 일자별 총 방문자수
+     * (현지인+외지인+외국인 합산)와 합산에 쓰인 행 개수를 함께 조회한다.
+     * 실패하거나 데이터가 없으면 빈 Map을 반환한다.
+     * <p>
+     * 같은 (areaCd, start, end) 조합은 하루 동안 캐시된다 — 이 API는 요청 범위와 무관하게
+     * 매번 전국 1년치(약 17,000건)를 반환해서 호출 비용이 크기 때문 (CacheConfig 참고).
      */
-    public Map<LocalDate, Long> fetchDailyVisitors(String areaCd, LocalDate start, LocalDate end) {
-        Map<LocalDate, Long> result = new TreeMap<>();
+    @Cacheable(cacheNames = CacheConfig.DATA_LAB_DAILY_VISITORS_CACHE, key = "#areaCd + '_' + #start + '_' + #end")
+    public Map<LocalDate, DailyVisitorAggregate> fetchDailyVisitorAggregates(String areaCd, LocalDate start, LocalDate end) {
+        Map<LocalDate, Long> sums = new TreeMap<>();
+        Map<LocalDate, Integer> counts = new TreeMap<>();
+        Map<LocalDate, DailyVisitorAggregate> result = new TreeMap<>();
         if (areaCd == null || areaCd.isBlank()) {
             return result;
         }
 
+        // DataLabService 응답은 행안부 표준 시도코드를 쓰므로 변환해서 비교해야 한다.
+        String targetAreaCode = TOUR_AREA_CD_TO_DATALAB_AREA_CODE.getOrDefault(areaCd, areaCd);
+
         try {
-            String encodedKey = URLEncoder.encode(serviceKey, StandardCharsets.UTF_8);
-            String urlStr = BASE_URL + "/metcoRegnVisitrDDList"
-                    + "?serviceKey=" + encodedKey
-                    + "&MobileOS=ETC&MobileApp=TripPing"
-                    + "&numOfRows=1000&pageNo=1&_type=json"
-                    + "&areaCd=" + URLEncoder.encode(areaCd, StandardCharsets.UTF_8)
-                    + "&startYmd=" + start.format(YMD)
-                    + "&endYmd=" + end.format(YMD);
+            int numOfRows = 1000;
+            int pageNo = 1;
+            int totalCount = Integer.MAX_VALUE;
+            int fetchedRows = 0;
 
-            String responseBody = restTemplate.getForObject(URI.create(urlStr), String.class);
-            JsonNode root = objectMapper.readTree(responseBody);
-            JsonNode itemNode = root.path("response").path("body").path("items").path("item");
+            while (fetchedRows < totalCount && pageNo <= MAX_PAGES) {
+                String encodedKey = URLEncoder.encode(serviceKey, StandardCharsets.UTF_8);
+                String urlStr = BASE_URL + "/metcoRegnVisitrDDList"
+                        + "?serviceKey=" + encodedKey
+                        + "&MobileOS=ETC&MobileApp=TripPing"
+                        + "&numOfRows=" + numOfRows + "&pageNo=" + pageNo + "&_type=json"
+                        + "&startYmd=" + start.format(YMD)
+                        + "&endYmd=" + end.format(YMD);
 
-            List<JsonNode> items = new ArrayList<>();
-            if (itemNode.isArray()) {
-                itemNode.forEach(items::add);
-            } else if (itemNode.isObject()) {
-                items.add(itemNode);
-            }
+                String responseBody = restTemplate.getForObject(URI.create(urlStr), String.class);
+                JsonNode root = objectMapper.readTree(responseBody);
+                JsonNode response = root.path("response");
 
-            for (JsonNode item : items) {
-                String baseYmd = item.path("baseYmd").asText(null);
-                double touNum = item.path("touNum").asDouble(0);
-                if (baseYmd == null || baseYmd.length() != 8) {
-                    continue;
+                String resultCode = response.path("header").path("resultCode").asText(null);
+                if (resultCode != null && !resultCode.equals("0000")) {
+                    log.warn("DataLabService(metcoRegnVisitrDDList) 응답 에러: resultCode={}, resultMsg={}",
+                            resultCode, response.path("header").path("resultMsg").asText(""));
+                    break;
                 }
-                LocalDate date = LocalDate.parse(baseYmd, YMD);
-                // touDivCd(1=현지인/2=외지인/3=외국인)별로 행이 따로 오므로 날짜당 합산.
-                result.merge(date, Math.round(touNum), Long::sum);
+
+                JsonNode body = response.path("body");
+                totalCount = body.path("totalCount").asInt(0);
+
+                JsonNode itemNode = body.path("items").path("item");
+                List<JsonNode> items = new ArrayList<>();
+                if (itemNode.isArray()) {
+                    itemNode.forEach(items::add);
+                } else if (itemNode.isObject()) {
+                    items.add(itemNode);
+                }
+
+                if (items.isEmpty()) {
+                    break;
+                }
+
+                for (JsonNode item : items) {
+                    // 이 API는 지역 필터 없이 전국 데이터를 다 주므로, 우리가 원하는 지역만 골라낸다.
+                    String itemAreaCode = item.path("areaCode").asText(null);
+                    if (itemAreaCode == null || !itemAreaCode.equals(targetAreaCode)) {
+                        continue;
+                    }
+                    String baseYmd = item.path("baseYmd").asText(null);
+                    double touNum = item.path("touNum").asDouble(0);
+                    if (baseYmd == null || baseYmd.length() != 8) {
+                        continue;
+                    }
+                    LocalDate date = LocalDate.parse(baseYmd, YMD);
+                    // touDivCd(1=현지인/2=외지인/3=외국인)별로 행이 따로 오므로 날짜당 합산 + 행 개수 카운트.
+                    sums.merge(date, Math.round(touNum), Long::sum);
+                    counts.merge(date, 1, Integer::sum);
+                }
+
+                fetchedRows += items.size();
+                pageNo++;
             }
         } catch (Exception e) {
             log.warn("DataLabService(metcoRegnVisitrDDList) 호출 실패: areaCd={}, error={}", areaCd, e.getMessage());
+        }
+
+        for (Map.Entry<LocalDate, Long> entry : sums.entrySet()) {
+            LocalDate date = entry.getKey();
+            result.put(date, new DailyVisitorAggregate(entry.getValue(), counts.getOrDefault(date, 0)));
         }
         return result;
     }
