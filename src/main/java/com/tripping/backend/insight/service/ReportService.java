@@ -7,7 +7,6 @@ import com.tripping.backend.insight.dto.ReportDetailResponse;
 import com.tripping.backend.insight.dto.ReportSummaryResponse;
 import com.tripping.backend.insight.dto.RouteRankingResponse;
 import com.tripping.backend.insight.dto.TrendsSummaryResponse;
-import com.tripping.backend.insight.entity.Report;
 import com.tripping.backend.insight.entity.ReportStatus;
 import com.tripping.backend.insight.repository.ReportRepository;
 import lombok.RequiredArgsConstructor;
@@ -37,7 +36,7 @@ public class ReportService {
         TrendsSummaryResponse summary = insightService.summary(request.getPeriod(), request.getRegion());
         List<RouteRankingResponse> routes = insightService.risingRoutes(request.getPeriod(), request.getRegion());
 
-        Report report = Report.builder()
+        InsightReport report = InsightReport.builder()
                 .organization(org)
                 .title(request.getTitle())
                 .type(request.getType())
@@ -60,7 +59,7 @@ public class ReportService {
 
     // 보고서 상세 (다운로드/열람용, content 포함)
     public ReportDetailResponse get(Long orgId, Long reportId) {
-        Report report = reportRepository.findByReportIdAndOrganization_OrgId(reportId, orgId)
+        InsightReport report = reportRepository.findByReportIdAndOrganization_OrgId(reportId, orgId)
                 .orElseThrow(() -> new IllegalArgumentException("보고서를 찾을 수 없습니다."));
         return toDetail(report);
     }
@@ -94,12 +93,12 @@ public class ReportService {
         return (rate >= 0 ? "+" : "") + rate;
     }
 
-    private ReportSummaryResponse toSummary(Report r) {
+    private ReportSummaryResponse toSummary(InsightReport r) {
         return new ReportSummaryResponse(r.getReportId(), r.getTitle(), r.getType(), r.getPeriod(),
                 r.getRegion(), r.getStatus().name(), r.getCreatedAt().format(TIMESTAMP_FORMAT));
     }
 
-    private ReportDetailResponse toDetail(Report r) {
+    private ReportDetailResponse toDetail(InsightReport r) {
         return new ReportDetailResponse(r.getReportId(), r.getTitle(), r.getType(), r.getPeriod(),
                 r.getRegion(), r.getStatus().name(), r.getCreatedAt().format(TIMESTAMP_FORMAT), r.getContent());
     }
