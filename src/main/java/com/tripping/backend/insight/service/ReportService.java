@@ -13,6 +13,7 @@ import com.tripping.backend.insight.repository.ReportRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
@@ -34,8 +35,11 @@ public class ReportService {
         Organization org = organizationRepository.findById(orgId)
                 .orElseThrow(() -> new IllegalArgumentException("Organization not found."));
 
-        TrendsSummaryResponse summary = insightService.summary(request.getPeriod(), request.getRegion());
-        List<RouteRankingResponse> routes = insightService.risingRoutes(request.getPeriod(), request.getRegion());
+        // 보고서는 "만든 시점" 기준 스냅샷이라 항상 오늘 기준으로 계산한다 (트렌드 화면의
+        // 날짜 선택기와 달리 과거 기준일을 지정할 방법이 없음).
+        DateRange range = DateRange.forPeriod(request.getPeriod(), LocalDate.now());
+        TrendsSummaryResponse summary = insightService.summary(request.getRegion(), range);
+        List<RouteRankingResponse> routes = insightService.risingRoutes(request.getRegion(), range);
 
         InsightReport report = InsightReport.builder()
                 .organization(org)
