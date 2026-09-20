@@ -28,8 +28,9 @@ public class InsightService {
     private final InsightRegionRepository insightRegionRepository;
     private final DataLabApiService dataLabApiService;
 
-    public TrendsSummaryResponse summary(String period, String region) {
-        DateRange current = DateRange.forPeriod(period, LocalDate.now());
+    // range 계산(period+endDate 조합인지, 달력에서 고른 startDate~endDate인지)은
+    // 컨트롤러가 이미 끝내서 넘겨준다 — 여기는 그 구간으로 집계만 한다.
+    public TrendsSummaryResponse summary(String region, DateRange current) {
         DateRange previous = current.previous();
         String regionName = normalizeRegion(region);
 
@@ -39,8 +40,7 @@ public class InsightService {
         return new TrendsSummaryResponse(currentTotal, round1(percentChange(currentTotal, previousTotal)));
     }
 
-    public List<RouteRankingResponse> risingRoutes(String period, String region) {
-        DateRange current = DateRange.forPeriod(period, LocalDate.now());
+    public List<RouteRankingResponse> risingRoutes(String region, DateRange current) {
         DateRange previous = current.previous();
         String regionName = normalizeRegion(region);
 
