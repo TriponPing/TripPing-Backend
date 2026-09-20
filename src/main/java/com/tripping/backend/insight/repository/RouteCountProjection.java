@@ -5,4 +5,7 @@ package com.tripping.backend.insight.repository;
 public interface RouteCountProjection {
     String getRouteName();
     Long getVisitCount();
+    // 방문 순서대로 이어붙인 spot_id 목록, 쉼표로 구분된 문자열 (예: "12,45,7"). 대체 관광지
+    // 추천 등에서 이 루트를 이루는 실제 장소를 다시 찾아가야 할 때 쓴다.
+    String getSpotIds();
 }

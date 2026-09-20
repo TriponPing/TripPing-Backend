@@ -15,5 +15,6 @@ public class ReportDetailResponse {
     private String region;
     private String status;
     private String createdAt;
-    private String content; // PDF로 내보낼 때 프론트에서 이 텍스트를 그대로 렌더링하면 됨
+    private String content;   // PDF로 내보낼 때 프론트에서 이 텍스트를 그대로 렌더링하면 됨
+    private Long productId;   // 상품 기획안 유형일 때만 값이 있음 (PDF 생성 시 프론트가 이 id로 상품 재조회)
 }

@@ -40,13 +40,19 @@ public class InsightReport {
     private String title; // 예: "9월 제주 관광 트렌드 분석" (프론트 모달 입력값 그대로)
 
     @Column(nullable = false, length = 30)
-    private String type; // "월간 트렌드" / "루트 네트워크" / "관광상품 기획안" (프론트 select 값 그대로)
+    private String type; // "트렌드 분석" / "루트 네트워크" / "상품 기획안" (프론트 select 값 그대로)
 
     @Column(nullable = false, length = 30)
     private String period; // 집계에 쓴 기간. 트렌드 화면과 동일한 값("최근 7일"/"최근 30일"/"최근 1년")
 
     @Column(nullable = false, length = 30)
     private String region; // 집계에 쓴 지역 ("전체 지역" 이면 필터 없음, 트렌드 화면과 동일한 값)
+
+    // 상품 기획안 유형일 때만 채워진다 - 어떤 tour_product를 기반으로 만든 보고서인지.
+    // 트렌드/루트 네트워크 보고서는 특정 상품에 매이지 않으므로 null.
+    // 다운로드 시점에 프론트가 이 id로 최신 상품 상세를 다시 조회해서 PDF를 만든다.
+    @Column(name = "product_id")
+    private Long productId;
 
     // 실제 보고서 본문 텍스트. 생성 시점의 트렌드 API 결과(총 방문 핑, 인기/급상승 루트)를
     // 문장으로 굳혀서 저장한다 — 프론트 lib/dashboardData.ts의 buildReportText()와 같은 발상.
