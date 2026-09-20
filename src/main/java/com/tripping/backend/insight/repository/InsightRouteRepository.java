@@ -17,10 +17,12 @@ public interface InsightRouteRepository extends JpaRepository<ActualRoute, Long>
     // "성산일출봉 → 섭지코지 → 우도" 같은 하나의 "루트 이름"을 만들고, 그 조합이 기간 내에
     // 몇 번이나 나왔는지 세서 상위 10개를 돌려준다. regionName이 null이면 지역 필터 없음.
     @Query(value = """
-            SELECT route_name AS routeName, COUNT(*) AS visitCount
+            SELECT route_name AS routeName, COUNT(*) AS visitCount,
+                   MAX(spot_ids) AS spotIds
             FROM (
                 SELECT ars.actual_route_id,
                        STRING_AGG(ts.name, ' → ' ORDER BY ars.visit_order) AS route_name,
+                       STRING_AGG(ts.spot_id::text, ',' ORDER BY ars.visit_order) AS spot_ids,
                        BOOL_AND(:regionName IS NULL OR r.region_name = CAST(:regionName AS varchar)) AS region_match
                 FROM actual_route ar
                 JOIN actual_route_spot ars ON ars.actual_route_id = ar.actual_route_id

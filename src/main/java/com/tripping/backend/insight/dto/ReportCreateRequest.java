@@ -8,7 +8,8 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class ReportCreateRequest {
     private String title;  // 보고서 제목 (예: "9월 제주 관광 트렌드 분석")
-    private String type;   // "월간 트렌드" / "루트 네트워크" / "관광상품 기획안"
-    private String period; // "최근 7일" / "최근 30일" / "최근 1년" — 트렌드 화면과 동일한 값을 그대로 씀
-    private String region; // "전체 지역" 등 — 트렌드 화면과 동일한 값
+    private String type;   // "트렌드 분석" / "루트 네트워크" / "상품 기획안"
+    private String period; // "최근 7일" / "최근 30일" / "최근 1년" — 트렌드 화면과 동일한 값을 그대로 씀. 상품 기획안일 땐 무시됨
+    private String region; // "전체 지역" 등 — 트렌드 화면과 동일한 값. 상품 기획안일 땐 무시됨
+    private Long productId; // type이 "상품 기획안"일 때만 필수 — 어떤 상품을 기반으로 만들지
 }

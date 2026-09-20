@@ -51,6 +51,14 @@ public class ReportController {
         return ResponseEntity.ok(reportService.get(currentOrgId(authentication), reportId));
     }
 
+    // [보고서 삭제] DELETE /b2b/insight/reports/{reportId}
+    @Operation(summary = "보고서 삭제")
+    @DeleteMapping("/{reportId}")
+    public ResponseEntity<Void> delete(@PathVariable Long reportId, Authentication authentication) {
+        reportService.delete(currentOrgId(authentication), reportId);
+        return ResponseEntity.noContent().build();
+    }
+
     // 로그인 주체가 기관(Organization)인지 확인하고 orgId를 꺼낸다.
     // Admin(운영자) 계정으로는 보고서를 만들 수 없게 막아둠 — 보고서는 기관 담당자 전용 기능이라서
     // (B2bAuthService.me()에서 principal이 Admin/Organization 중 뭔지 구분하는 것과 같은 패턴).

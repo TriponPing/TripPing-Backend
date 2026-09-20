@@ -2,6 +2,7 @@ package com.tripping.backend.insight.controller;
 
 import com.tripping.backend.insight.dto.DailyVisitResponse;
 import com.tripping.backend.insight.dto.RouteRankingResponse;
+import com.tripping.backend.insight.dto.SpotEvidenceResponse;
 import com.tripping.backend.insight.dto.TrendsSummaryResponse;
 import com.tripping.backend.insight.service.DateRange;
 import com.tripping.backend.insight.service.InsightService;
@@ -67,6 +68,16 @@ public class InsightController {
         if (startDate == null) return DateRange.forPeriod(period, resolvedEnd);
         LocalDate resolvedStart = startDate.isAfter(resolvedEnd) ? resolvedEnd : startDate;
         return new DateRange(resolvedStart, resolvedEnd);
+    }
+
+    // [관광지 평점·후기 근거] GET /b2b/insight/spots/evidence?spotIds=1,2,3
+    // "상품 기획안" 보고서가 이 관광지들에 실제로 쌓인 평점·후기를 근거로 제시할 때 쓴다.
+    @Operation(summary = "관광지들의 실제 평점·후기 근거 조회", description = "spotIds에 해당하는 관광지들에 남겨진 실제 평점 평균과 최신 후기 일부를 반환한다.")
+    @GetMapping("/spots/evidence")
+    public ResponseEntity<SpotEvidenceResponse> spotEvidence(
+            @Parameter(description = "쉼표로 구분한 spotId 목록, 예: 1,2,3")
+            @RequestParam List<Long> spotIds) {
+        return ResponseEntity.ok(insightService.spotEvidence(spotIds));
     }
 
     // [일자별 이동량] GET /b2b/insight/trends/daily?period=최근 30일&region=전체 지역
