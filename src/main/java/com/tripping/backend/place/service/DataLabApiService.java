@@ -9,9 +9,11 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.function.Consumer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -47,6 +49,7 @@ public class DataLabApiService {
     private static final String BASE_URL = "https://apis.data.go.kr/B551011/DataLabService";
     private static final DateTimeFormatter YMD = DateTimeFormatter.BASIC_ISO_DATE;
     private static final int MAX_PAGES = 50; // 안전장치 - 무한루프 방지
+    private static final int RELIABLE_ROW_COUNT = 3; // touDivCd(현지인/외지인/외국인) 3개가 다 있어야 신뢰
 
     // 관광공사 TourAPI areaCd(우리 Region.apiAreaCd) -> 행정안전부 표준 시도코드(DataLabService 응답 areaCode).
     // ⚠️ 강원=51, 전북=52는 실제 API 응답 데이터로 검증 완료된 값. 수정하지 말 것.
@@ -69,6 +72,16 @@ public class DataLabApiService {
             Map.entry("38", "46"), // 전남
             Map.entry("39", "50")  // 제주
     );
+
+    // 위 매핑의 역방향 (행안부 표준코드 -> TourAPI areaCd). 전국을 한 번에 집계할 때,
+    // 응답의 areaCode를 우리 Region.apiAreaCd 체계로 되돌리는 데 쓴다.
+    private static final Map<String, String> DATALAB_AREA_CODE_TO_TOUR_AREA_CD = buildReverseMap();
+
+    private static Map<String, String> buildReverseMap() {
+        Map<String, String> reverse = new HashMap<>();
+        TOUR_AREA_CD_TO_DATALAB_AREA_CODE.forEach((tourCd, dataLabCd) -> reverse.put(dataLabCd, tourCd));
+        return Map.copyOf(reverse);
+    }
 
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -102,6 +115,77 @@ public class DataLabApiService {
         // DataLabService 응답은 행안부 표준 시도코드를 쓰므로 변환해서 비교해야 한다.
         String targetAreaCode = TOUR_AREA_CD_TO_DATALAB_AREA_CODE.getOrDefault(areaCd, areaCd);
 
+        forEachItem(start, end, item -> {
+            // 이 API는 지역 필터 없이 전국 데이터를 다 주므로, 우리가 원하는 지역만 골라낸다.
+            String itemAreaCode = item.path("areaCode").asText(null);
+            if (itemAreaCode == null || !itemAreaCode.equals(targetAreaCode)) {
+                return;
+            }
+            LocalDate date = parseBaseYmd(item);
+            if (date == null) {
+                return;
+            }
+            // touDivCd(1=현지인/2=외지인/3=외국인)별로 행이 따로 오므로 날짜당 합산 + 행 개수 카운트.
+            sums.merge(date, Math.round(item.path("touNum").asDouble(0)), Long::sum);
+            counts.merge(date, 1, Integer::sum);
+        }, "areaCd=" + areaCd);
+
+        for (Map.Entry<LocalDate, Long> entry : sums.entrySet()) {
+            LocalDate date = entry.getKey();
+            result.put(date, new DailyVisitorAggregate(entry.getValue(), counts.getOrDefault(date, 0)));
+        }
+        return result;
+    }
+
+    /**
+     * 전국 17개 시도의 기간 내 총 방문자수를 한 번의 조회로 모두 집계한다.
+     * 대시보드 "지역별 인기" 랭킹처럼 지역끼리 비교해야 할 때 쓴다 —
+     * 지역마다 fetchDailyVisitorAggregates()를 17번 부르는 대신, 어차피 전국이 통째로
+     * 오는 응답을 한 번만 읽어서 areaCode별로 나눠 담는다.
+     * <p>
+     * 반환 키는 우리 Region.apiAreaCd(관광공사 TourAPI 체계)로 되돌려서 준다.
+     * touDivCd 3종이 다 모이지 않은 날짜는 신뢰할 수 없어 합산에서 제외한다.
+     */
+    @Cacheable(cacheNames = CacheConfig.DATA_LAB_DAILY_VISITORS_CACHE, key = "'ALL_REGIONS_' + #start + '_' + #end")
+    public Map<String, Long> fetchRegionTotals(LocalDate start, LocalDate end) {
+        // areaCode -> (날짜 -> [합계, 행 개수])
+        Map<String, Map<LocalDate, long[]>> perArea = new HashMap<>();
+
+        forEachItem(start, end, item -> {
+            String itemAreaCode = item.path("areaCode").asText(null);
+            if (itemAreaCode == null) {
+                return;
+            }
+            LocalDate date = parseBaseYmd(item);
+            if (date == null) {
+                return;
+            }
+            long[] slot = perArea
+                    .computeIfAbsent(itemAreaCode, k -> new TreeMap<>())
+                    .computeIfAbsent(date, k -> new long[2]);
+            slot[0] += Math.round(item.path("touNum").asDouble(0));
+            slot[1] += 1;
+        }, "allRegions");
+
+        Map<String, Long> totals = new HashMap<>();
+        perArea.forEach((areaCode, byDate) -> {
+            long sum = 0;
+            for (long[] slot : byDate.values()) {
+                if (slot[1] >= RELIABLE_ROW_COUNT) {
+                    sum += slot[0];
+                }
+            }
+            String tourAreaCd = DATALAB_AREA_CODE_TO_TOUR_AREA_CD.get(areaCode);
+            if (tourAreaCd != null && sum > 0) {
+                totals.put(tourAreaCd, sum);
+            }
+        });
+        return totals;
+    }
+
+    // 페이지네이션을 돌면서 응답의 item 하나하나를 consumer에게 넘긴다.
+    // 두 공개 메서드가 같은 호출/페이징 로직을 쓰되 집계 방식만 다르기 때문에 여기로 뺐다.
+    private void forEachItem(LocalDate start, LocalDate end, Consumer<JsonNode> consumer, String logContext) {
         try {
             int numOfRows = 1000;
             int pageNo = 1;
@@ -143,34 +227,25 @@ public class DataLabApiService {
                     break;
                 }
 
-                for (JsonNode item : items) {
-                    // 이 API는 지역 필터 없이 전국 데이터를 다 주므로, 우리가 원하는 지역만 골라낸다.
-                    String itemAreaCode = item.path("areaCode").asText(null);
-                    if (itemAreaCode == null || !itemAreaCode.equals(targetAreaCode)) {
-                        continue;
-                    }
-                    String baseYmd = item.path("baseYmd").asText(null);
-                    double touNum = item.path("touNum").asDouble(0);
-                    if (baseYmd == null || baseYmd.length() != 8) {
-                        continue;
-                    }
-                    LocalDate date = LocalDate.parse(baseYmd, YMD);
-                    // touDivCd(1=현지인/2=외지인/3=외국인)별로 행이 따로 오므로 날짜당 합산 + 행 개수 카운트.
-                    sums.merge(date, Math.round(touNum), Long::sum);
-                    counts.merge(date, 1, Integer::sum);
-                }
+                items.forEach(consumer);
 
                 fetchedRows += items.size();
                 pageNo++;
             }
         } catch (Exception e) {
-            log.warn("DataLabService(metcoRegnVisitrDDList) 호출 실패: areaCd={}, error={}", areaCd, e.getMessage());
+            log.warn("DataLabService(metcoRegnVisitrDDList) 호출 실패: {}, error={}", logContext, e.getMessage());
         }
+    }
 
-        for (Map.Entry<LocalDate, Long> entry : sums.entrySet()) {
-            LocalDate date = entry.getKey();
-            result.put(date, new DailyVisitorAggregate(entry.getValue(), counts.getOrDefault(date, 0)));
+    private LocalDate parseBaseYmd(JsonNode item) {
+        String baseYmd = item.path("baseYmd").asText(null);
+        if (baseYmd == null || baseYmd.length() != 8) {
+            return null;
         }
-        return result;
+        try {
+            return LocalDate.parse(baseYmd, YMD);
+        } catch (Exception e) {
+            return null;
+        }
     }
 }
