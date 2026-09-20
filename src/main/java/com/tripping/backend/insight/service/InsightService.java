@@ -4,17 +4,20 @@ import com.tripping.backend.entity.Region;
 import com.tripping.backend.insight.dto.DailyVisitResponse;
 import com.tripping.backend.insight.dto.RegionalVisitorResponse;
 import com.tripping.backend.insight.dto.RouteRankingResponse;
+import com.tripping.backend.insight.dto.SpotEvidenceResponse;
 import com.tripping.backend.insight.dto.TrendsSummaryResponse;
 import com.tripping.backend.insight.repository.DailyVisitProjection;
 import com.tripping.backend.insight.repository.InsightRegionRepository;
 import com.tripping.backend.insight.repository.InsightRouteRepository;
 import com.tripping.backend.insight.repository.RouteCountProjection;
+import com.tripping.backend.insight.repository.SpotEvidenceRepository;
 import com.tripping.backend.place.service.DataLabApiService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -37,7 +40,11 @@ public class InsightService {
     private static final double MAX_VALID_FACTOR = 2.0;
     private static final int MIN_RELIABLE_ROW_COUNT = 3; // touDivCd(현지인/외지인/외국인) 3개가 다 있어야 신뢰
 
+    // ---- 상품 기획안 보고서 근거(spotEvidence)용 ----
+    private static final int MAX_SAMPLE_COMMENTS = 3;
+
     private final InsightRouteRepository insightRouteRepository;
+    private final SpotEvidenceRepository spotEvidenceRepository;
     private final InsightRegionRepository insightRegionRepository;
     private final DataLabApiService dataLabApiService;
 
@@ -67,12 +74,22 @@ public class InsightService {
                 .map(row -> {
                     long previousCount = previousCounts.getOrDefault(row.getRouteName(), 0L);
                     double changeRate = round1(percentChange(row.getVisitCount(), previousCount));
-                    return new RouteRankingResponse(row.getRouteName(), row.getVisitCount(), changeRate);
+                    return new RouteRankingResponse(row.getRouteName(), row.getVisitCount(), changeRate, parseSpotIds(row.getSpotIds()));
                 })
                 .sorted(Comparator.comparingLong(RouteRankingResponse::getVisitCount).reversed())
                 .toList();
     }
 
+    // "12,45,7" -> [12, 45, 7]. 빈 값이 오는 일은 없지만(루트는 항상 spot 1개 이상으로
+    // 이뤄짐) 방어적으로 null·빈 문자열은 빈 리스트로 처리한다.
+    private List<Long> parseSpotIds(String csv) {
+        if (csv == null || csv.isBlank()) return List.of();
+        return Arrays.stream(csv.split(",")).map(Long::parseLong).toList();
+    }
+
+    // "일자별 이동량" 차트용 - summary()와 같은 DateRange.forPeriod()로 기간을 구하지만,
+    // 직전 기간과 비교하지 않고 선택한 기간 안의 날짜별 건수만 반환한다.
+    // 방문 기록이 없는 날짜도 차트에서 끊기지 않도록 0건으로 채워서 모든 날짜를 다 내려준다.
     public List<DailyVisitResponse> dailyVisits(String period, String region) {
         DateRange current = DateRange.forPeriod(period, LocalDate.now());
         String regionName = normalizeRegion(region);
@@ -86,6 +103,21 @@ public class InsightService {
             result.add(new DailyVisitResponse(date, countsByDate.getOrDefault(date, 0L)));
         }
         return result;
+    }
+
+    // "상품 기획안" 보고서의 데이터 근거용 - 주어진 관광지들에 실제로 쌓인 평점·후기를
+    // 있는 그대로 집계한다. 기간·지역으로 거르지 않는다(만족도는 트렌드처럼 특정 구간의
+    // "변화"가 아니라 그 장소 자체의 누적 품질 신호라서, PlaceDetail의 averageRating과
+    // 같은 방식으로 전체 기간을 본다.
+    public SpotEvidenceResponse spotEvidence(List<Long> spotIds) {
+        if (spotIds == null || spotIds.isEmpty()) {
+            return new SpotEvidenceResponse(null, 0, List.of());
+        }
+        SpotEvidenceRepository.RatingRow rating = spotEvidenceRepository.findAverageRating(spotIds);
+        Double average = rating == null || rating.getAverageRating() == null ? null : round1(rating.getAverageRating());
+        long count = rating == null || rating.getRatingCount() == null ? 0 : rating.getRatingCount();
+        List<String> comments = spotEvidenceRepository.findRecentComments(spotIds, MAX_SAMPLE_COMMENTS);
+        return new SpotEvidenceResponse(average, count, comments);
     }
 
     // [지역별 이동량 변화 차트] 한국관광공사 "빅데이터 지역별 방문자수(DataLabService)" 기준,
@@ -221,6 +253,7 @@ public class InsightService {
         return null;
     }
 
+    // 프론트의 "전체 지역"은 지역 필터 없음(null)으로 취급.
     private String normalizeRegion(String region) {
         if (region == null || region.isBlank() || region.equals("전체 지역")) return null;
         return region;
