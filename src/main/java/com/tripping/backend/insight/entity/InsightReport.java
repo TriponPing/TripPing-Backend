@@ -50,8 +50,10 @@ public class InsightReport {
 
     // 실제 보고서 본문 텍스트. 생성 시점의 트렌드 API 결과(총 방문 핑, 인기/급상승 루트)를
     // 문장으로 굳혀서 저장한다 — 프론트 lib/dashboardData.ts의 buildReportText()와 같은 발상.
-    @Lob
-    @Column(nullable = false)
+    // @Lob이었으나 PostgreSQL에서 large object(oid)로 매핑되어 자동커밋 모드에서 조회 시
+    // "대형 객체는 자동 커밋 모드에서 사용할 수 없습니다" 에러가 남 — AppUser.profileImage 때와
+    // 같은 문제라 그때처럼 columnDefinition="text"로 일반 텍스트 컬럼으로 매핑되게 바꿈.
+    @Column(nullable = false, columnDefinition = "text")
     private String content;
 
     @Enumerated(EnumType.STRING)
