@@ -29,15 +29,29 @@ import java.util.*;
 @Service
 public class B2bSpotSearchService {
 
+    // tourist_spot.category는 앱에서 쓰는 attraction/restaurant/cafe 세 값으로
+    // 굳어져 있다(PopularTripService·TouristSpotService·RouteRecommendService가
+    // 이 값으로 분기한다). 관광공사 분류를 그대로 넣으면 그 분기에서 전부
+    // 빠지므로 여기서 세 값으로 맞춘다.
     private static final Map<String, String> CONTENT_TYPE_TO_CATEGORY = Map.of(
-            "12", "관광지",
-            "14", "문화시설",
-            "15", "축제공연행사",
-            "28", "레포츠",
-            "32", "숙박",
-            "38", "쇼핑",
-            "39", "음식점"
+            "12", "attraction",   // 관광지
+            "14", "attraction",   // 문화시설
+            "15", "attraction",   // 축제공연행사
+            "28", "attraction",   // 레포츠
+            "39", "restaurant"    // 음식점 — 카페는 아래 cat3로 따로 가른다
+            // 32(숙박) · 38(쇼핑)은 대응하는 값이 없어 분류 없이 둔다.
     );
+
+    // 관광공사에는 카페가 별도 분류로 없고 음식점(39) 안에 소분류로 들어 있다.
+    private static final String CAT3_CAFE = "A05020900"; // 카페·전통찻집
+
+    private String categoryOf(JsonNode item) {
+        String category = CONTENT_TYPE_TO_CATEGORY.get(text(item, "contenttypeid"));
+        if ("restaurant".equals(category) && CAT3_CAFE.equals(text(item, "cat3"))) {
+            return "cafe";
+        }
+        return category;
+    }
 
     // TourAPI 지역코드 → 우리 region 테이블 코드.
     private static final Map<String, String> AREA_TO_REGION = Map.ofEntries(
@@ -88,7 +102,7 @@ public class B2bSpotSearchService {
                     .contentId(contentId)
                     .name(name)
                     .address(text(item, "addr1"))
-                    .category(CONTENT_TYPE_TO_CATEGORY.get(text(item, "contenttypeid")))
+                    .category(categoryOf(item))
                     .latitude(decimal(item, "mapy"))
                     .longitude(decimal(item, "mapx"))
                     .imageUrl(text(item, "firstimage"))
@@ -118,7 +132,7 @@ public class B2bSpotSearchService {
         TouristSpot spot = touristSpotRepository.save(TouristSpot.builder()
                 .apiContentId(contentId)
                 .name(cut(text(item, "title"), 100))
-                .category(CONTENT_TYPE_TO_CATEGORY.get(text(item, "contenttypeid")))
+                .category(categoryOf(item))
                 .regionId(AREA_TO_REGION.get(text(item, "areacode")))
                 .address(cut(text(item, "addr1"), 255))
                 .latitude(decimal(item, "mapy"))
