@@ -1,5 +1,6 @@
 package com.tripping.backend.insight.repository;
 
+import com.tripping.backend.insight.entity.InsightReport;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;

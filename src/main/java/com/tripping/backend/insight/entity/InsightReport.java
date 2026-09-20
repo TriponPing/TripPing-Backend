@@ -8,6 +8,12 @@ import java.time.LocalDateTime;
 
 // "보고서 센터"(TripPing-Web pages/Reports.tsx)에 뜨는, 실제로 저장된 보고서 1건.
 //
+// 클래스 이름을 InsightReport로 지은 이유: 원래 Report로 만들었더니 기존 앱에 이미 있던
+// com.tripping.backend.entity.Report(콘텐츠 신고용 — 게시물/댓글 신고 처리 상태)랑
+// 클래스 이름이 겹쳐서 Hibernate가 "엔티티 이름이 중복된다"고 에러를 냈다
+// (패키지가 달라도 JPA 엔티티 이름은 기본적으로 클래스 이름 기준이라 이렇게 됨).
+// 그래서 아예 이름 자체를 InsightReport로 바꿔서 안 겹치게 함. 테이블명(insight_report)은 그대로.
+//
 // 트렌드 화면(InsightController)은 항상 "지금 시점 기준"으로 실시간 재계산해서 보여주지만,
 // 보고서는 다르다: 담당자가 "9월 제주 트렌드 분석" 같은 보고서를 만들면, 그 시점에 계산된
 // 숫자를 텍스트로 굳혀서(content) 저장해둔다. 나중에 실제 방문 데이터가 더 쌓여서
@@ -17,7 +23,7 @@ import java.time.LocalDateTime;
 @Table(name = "insight_report")
 @Getter @Setter
 @NoArgsConstructor @AllArgsConstructor @Builder
-public class Report {
+public class InsightReport {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
