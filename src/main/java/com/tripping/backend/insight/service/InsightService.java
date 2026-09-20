@@ -1,13 +1,17 @@
 package com.tripping.backend.insight.service;
 
+import com.tripping.backend.entity.Region;
 import com.tripping.backend.insight.dto.DailyVisitResponse;
+import com.tripping.backend.insight.dto.RegionalVisitorResponse;
 import com.tripping.backend.insight.dto.RouteRankingResponse;
 import com.tripping.backend.insight.dto.SpotEvidenceResponse;
 import com.tripping.backend.insight.dto.TrendsSummaryResponse;
 import com.tripping.backend.insight.repository.DailyVisitProjection;
+import com.tripping.backend.insight.repository.InsightRegionRepository;
 import com.tripping.backend.insight.repository.InsightRouteRepository;
 import com.tripping.backend.insight.repository.RouteCountProjection;
 import com.tripping.backend.insight.repository.SpotEvidenceRepository;
+import com.tripping.backend.place.service.DataLabApiService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -27,6 +31,8 @@ public class InsightService {
 
     private final InsightRouteRepository insightRouteRepository;
     private final SpotEvidenceRepository spotEvidenceRepository;
+    private final InsightRegionRepository insightRegionRepository;
+    private final DataLabApiService dataLabApiService;
 
     // range 계산(period+endDate 조합인지, 달력에서 고른 startDate~endDate인지)은
     // 컨트롤러가 이미 끝내서 넘겨준다 — 여기는 그 구간으로 집계만 한다.
@@ -47,7 +53,6 @@ public class InsightService {
         List<RouteCountProjection> currentRoutes = insightRouteRepository.findTopRoutes(current.start(), current.end(), regionName);
         List<RouteCountProjection> previousRoutes = insightRouteRepository.findTopRoutes(previous.start(), previous.end(), regionName);
 
-        // 루트 이름(방문 순서까지 포함한 문자열)을 키로 직전 기간 방문 횟수를 찾아서 증감률 계산.
         Map<String, Long> previousCounts = previousRoutes.stream()
                 .collect(Collectors.toMap(RouteCountProjection::getRouteName, RouteCountProjection::getVisitCount, (a, b) -> a));
 
@@ -101,14 +106,39 @@ public class InsightService {
         return new SpotEvidenceResponse(average, count, comments);
     }
 
+    // [일자별 이동량 차트 참고선] 한국관광공사 "빅데이터 지역별 방문자수(DataLabService)" 기준,
+    // 선택한 지역(시도)의 실제 방문자 규모. 우리 자체 방문 핑 데이터가 아직 적어서(콜드스타트),
+    // 국가 통계 기준 실제 방문자 흐름을 옆에 같이 보여주기 위한 용도.
+    // "전체 지역"이거나 매핑된 areaCd가 없는 지역이면 빈 리스트를 반환한다(프론트에서 참고선 숨김).
+    public List<RegionalVisitorResponse> regionalVisitors(String period, String region) {
+        String regionName = normalizeRegion(region);
+        if (regionName == null) {
+            return List.of();
+        }
+
+        String areaCd = insightRegionRepository.findByRegionName(regionName)
+                .map(Region::getApiAreaCd)
+                .orElse(null);
+        if (areaCd == null || areaCd.isBlank()) {
+            return List.of();
+        }
+
+        DateRange current = DateRange.forPeriod(period, LocalDate.now());
+        Map<LocalDate, Long> visitorsByDate = dataLabApiService.fetchDailyVisitors(areaCd, current.start(), current.end());
+
+        List<RegionalVisitorResponse> result = new ArrayList<>();
+        for (LocalDate date = current.start(); !date.isAfter(current.end()); date = date.plusDays(1)) {
+            result.add(new RegionalVisitorResponse(date, visitorsByDate.getOrDefault(date, 0L)));
+        }
+        return result;
+    }
+
     // 프론트의 "전체 지역"은 지역 필터 없음(null)으로 취급.
     private String normalizeRegion(String region) {
         if (region == null || region.isBlank() || region.equals("전체 지역")) return null;
         return region;
     }
 
-    // 직전 기간이 0인데 이번 기간도 0이면 변화 없음(0%), 0에서 뭔가 생겼으면 "신규 급상승"
-    // 의미로 +100%를 준다 (0으로 나누기를 피하면서도 "새로 생긴 루트"를 상위로 보이게 함).
     private double percentChange(long current, long previous) {
         if (previous == 0) return current == 0 ? 0.0 : 100.0;
         return ((double) (current - previous) / previous) * 100.0;

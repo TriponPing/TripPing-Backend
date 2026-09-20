@@ -46,11 +46,18 @@ public class B2bSpotSearchService {
     private static final String CAT3_CAFE = "A05020900"; // 카페·전통찻집
 
     private String categoryOf(JsonNode item) {
-        String category = CONTENT_TYPE_TO_CATEGORY.get(text(item, "contenttypeid"));
+        String category = lookup(CONTENT_TYPE_TO_CATEGORY, text(item, "contenttypeid"));
         if ("restaurant".equals(category) && CAT3_CAFE.equals(text(item, "cat3"))) {
             return "cafe";
         }
         return category;
+    }
+
+    // Map.of / Map.ofEntries로 만든 불변 Map은 null 키로 조회하면 그대로 NPE를
+    // 던진다. 관광공사 응답에는 지역코드나 분류코드가 빠진 관광지가 섞여 있어
+    // 조회 전에 걸러낸다. 코드가 없으면 그 항목만 분류 없이 둔다.
+    private String lookup(Map<String, String> table, String code) {
+        return code == null ? null : table.get(code);
     }
 
     // TourAPI 지역코드 → 우리 region 테이블 코드.
@@ -133,7 +140,7 @@ public class B2bSpotSearchService {
                 .apiContentId(contentId)
                 .name(cut(text(item, "title"), 100))
                 .category(categoryOf(item))
-                .regionId(AREA_TO_REGION.get(text(item, "areacode")))
+                .regionId(lookup(AREA_TO_REGION, text(item, "areacode")))
                 .address(cut(text(item, "addr1"), 255))
                 .latitude(decimal(item, "mapy"))
                 .longitude(decimal(item, "mapx"))
