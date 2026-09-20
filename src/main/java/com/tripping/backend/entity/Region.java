@@ -20,4 +20,10 @@ public class Region {
     @Enumerated(EnumType.STRING)
     @Column(name = "region_type", nullable = false)
     private RegionType regionType;
+
+    // 👈 새로 추가: 한국관광공사 OpenAPI(TourAPI/DataLab 등)가 요구하는 시도 단위 지역코드.
+    // 우리 자체 regionId("R01" 등)와는 완전히 다른 체계라 별도 컬럼으로 매핑해둠.
+    // 값은 GlobalConfig의 RegionSeeder에서 채워짐 (예: 제주=39, 서울=1).
+    @Column(name = "api_area_cd", length = 10)
+    private String apiAreaCd;
 }

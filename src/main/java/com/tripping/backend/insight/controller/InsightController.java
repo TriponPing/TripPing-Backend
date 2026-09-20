@@ -1,6 +1,7 @@
 package com.tripping.backend.insight.controller;
 
 import com.tripping.backend.insight.dto.DailyVisitResponse;
+import com.tripping.backend.insight.dto.RegionalVisitorResponse;
 import com.tripping.backend.insight.dto.RouteRankingResponse;
 import com.tripping.backend.insight.dto.TrendsSummaryResponse;
 import com.tripping.backend.insight.service.InsightService;
@@ -55,5 +56,19 @@ public class InsightController {
             @Parameter(description = "지역명. \"전체 지역\"이면 필터 없음")
             @RequestParam(defaultValue = "전체 지역") String region) {
         return ResponseEntity.ok(insightService.dailyVisits(period, region));
+    }
+
+    // [지역 전체 방문자수 참고선] GET /b2b/insight/trends/regional-visitors?period=최근 30일&region=제주
+    // 한국관광공사 "빅데이터 지역별 방문자수(DataLabService)" 기준 국가 통계 방문자수.
+    // 우리 자체 방문 핑 데이터(위 daily)와 비교해서 보여주기 위한 것 - 특정 지역을 골랐을 때만
+    // 의미가 있어서 "전체 지역"이거나 매핑이 없는 지역이면 빈 리스트를 반환한다.
+    @Operation(summary = "지역 전체 방문자수(관광공사 통계) 조회", description = "선택한 지역(시도)의 국가 통계 기준 일자별 방문자수. \"전체 지역\"이거나 관광공사 지역코드가 없는 지역이면 빈 리스트를 반환한다.")
+    @GetMapping("/trends/regional-visitors")
+    public ResponseEntity<List<RegionalVisitorResponse>> regionalVisitors(
+            @Parameter(description = "\"최근 7일\" / \"최근 30일\" / \"최근 1년\"")
+            @RequestParam(defaultValue = "최근 30일") String period,
+            @Parameter(description = "지역명. \"전체 지역\"이면 빈 리스트 반환")
+            @RequestParam(defaultValue = "전체 지역") String region) {
+        return ResponseEntity.ok(insightService.regionalVisitors(period, region));
     }
 }
