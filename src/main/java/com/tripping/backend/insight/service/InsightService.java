@@ -125,36 +125,33 @@ public class InsightService {
     // 아직 적어서(콜드스타트) + DataLab 실측 데이터가 약 5주 지연 공개돼서 "최근 N일" 구간은
     // 실측값이 부족하다. 그래서 없는 날짜는 작년 동기(364일 전, 요일 정렬 목적) 데이터에
     // 최근 4주 기준 보정계수를 곱해 추정하고, 마지막에 7일 이동평균으로 평활한다.
-    // "전체 지역"이거나 매핑된 areaCd가 없는 지역이면 빈 리스트를 반환한다(프론트에서 참고선 숨김).
+    // "전체 지역"이면 전국 17개 시도를 합산한 전국 이동량을 내려준다.
+    // 특정 지역인데 관광공사 지역코드 매핑이 없으면 빈 리스트를 반환한다(프론트에서 참고선 숨김).
     public List<RegionalVisitorResponse> regionalVisitors(String period, String region) {
         String regionName = normalizeRegion(region);
-        if (regionName == null) {
-            return List.of();
-        }
 
-        String areaCd = insightRegionRepository.findByRegionName(regionName)
-                .map(Region::getApiAreaCd)
-                .orElse(null);
-        if (areaCd == null || areaCd.isBlank()) {
-            return List.of();
+        String areaCd = null;
+        if (regionName != null) {
+            areaCd = insightRegionRepository.findByRegionName(regionName)
+                    .map(Region::getApiAreaCd)
+                    .orElse(null);
+            if (areaCd == null || areaCd.isBlank()) {
+                return List.of();
+            }
         }
 
         DateRange current = DateRange.forPeriod(period, LocalDate.now());
 
-        // 1) 데이터 확보 — 요청 구간이 아니라 작년 동기 비교가 가능할 만큼 넉넉한 과거 범위로
-        // 한 번만 호출한다. 이 API는 어차피 범위와 무관하게 전국 1년치를 다 주므로 비용은 동일하다.
-        LocalDate fetchStart = current.start().minusDays(LOOKBACK_DAYS);
-        LocalDate fetchEnd = LocalDate.now();
-        Map<LocalDate, DataLabApiService.DailyVisitorAggregate> aggregates =
-                dataLabApiService.fetchDailyVisitorAggregates(areaCd, fetchStart, fetchEnd);
+        // 1) 데이터 확보 — 전국을 하루에 한 번만 받아서 캐시하고 여기서 필요한 만큼 잘라 쓴다.
+        // 이 API는 요청 범위와 무관하게 매번 전국치를 통째로 주기 때문에, 지역·기간별로
+        // 따로 부르면 같은 응답을 반복해서 받게 된다(화면이 몇 초씩 멈추던 원인).
+        Map<String, Map<LocalDate, DataLabApiService.DailyVisitorAggregate>> byRegion =
+                dataLabApiService.fetchAllRegionDailyAggregates();
 
         // 2) 비정상 날짜 제거 — touDivCd(현지인/외지인/외국인) 3개가 다 모이지 않은 날짜는 제외.
-        TreeMap<LocalDate, Long> actualByDate = new TreeMap<>();
-        for (Map.Entry<LocalDate, DataLabApiService.DailyVisitorAggregate> entry : aggregates.entrySet()) {
-            if (entry.getValue().rowCount() >= MIN_RELIABLE_ROW_COUNT) {
-                actualByDate.put(entry.getKey(), entry.getValue().totalVisitors());
-            }
-        }
+        TreeMap<LocalDate, Long> actualByDate = areaCd == null
+                ? sumAllRegions(byRegion)
+                : reliableOnly(byRegion.getOrDefault(areaCd, Map.of()));
 
         // 3) 보정계수 계산 (최근 4주 vs 작년 같은 4주)
         double correctionFactor = calculateCorrectionFactor(actualByDate);
@@ -197,6 +194,45 @@ public class InsightService {
             result.add(new RegionalVisitorResponse(date, smoothed, estimatedByDate.get(date)));
         }
         return result;
+    }
+
+    // 한 지역의 일자별 집계에서 신뢰할 수 있는 날짜만 남긴다.
+    private TreeMap<LocalDate, Long> reliableOnly(Map<LocalDate, DataLabApiService.DailyVisitorAggregate> aggregates) {
+        TreeMap<LocalDate, Long> actualByDate = new TreeMap<>();
+        for (Map.Entry<LocalDate, DataLabApiService.DailyVisitorAggregate> entry : aggregates.entrySet()) {
+            if (entry.getValue().rowCount() >= MIN_RELIABLE_ROW_COUNT) {
+                actualByDate.put(entry.getKey(), entry.getValue().totalVisitors());
+            }
+        }
+        return actualByDate;
+    }
+
+    // "전체 지역"일 때 쓰는 전국 합계. 날짜별로 신뢰할 수 있는 시도들의 값만 더한다.
+    // 일부 시도의 데이터가 빠진 날짜는 전국 합계도 과소 집계되므로, 그날 집계에 들어간
+    // 시도 수가 너무 적으면(절반 미만) 아예 실측으로 치지 않고 추정에 맡긴다.
+    private TreeMap<LocalDate, Long> sumAllRegions(
+            Map<String, Map<LocalDate, DataLabApiService.DailyVisitorAggregate>> byRegion) {
+        TreeMap<LocalDate, Long> sums = new TreeMap<>();
+        TreeMap<LocalDate, Integer> regionCounts = new TreeMap<>();
+
+        for (Map<LocalDate, DataLabApiService.DailyVisitorAggregate> aggregates : byRegion.values()) {
+            for (Map.Entry<LocalDate, DataLabApiService.DailyVisitorAggregate> entry : aggregates.entrySet()) {
+                if (entry.getValue().rowCount() < MIN_RELIABLE_ROW_COUNT) {
+                    continue;
+                }
+                sums.merge(entry.getKey(), entry.getValue().totalVisitors(), Long::sum);
+                regionCounts.merge(entry.getKey(), 1, Integer::sum);
+            }
+        }
+
+        int minRegions = Math.max(1, byRegion.size() / 2);
+        TreeMap<LocalDate, Long> actualByDate = new TreeMap<>();
+        sums.forEach((date, total) -> {
+            if (regionCounts.getOrDefault(date, 0) >= minRegions) {
+                actualByDate.put(date, total);
+            }
+        });
+        return actualByDate;
     }
 
     // 최근 4주(compareWindow) 실측 합계 ÷ 작년 같은 4주 실측 합계. 요일 정렬을 위해 364일 전을

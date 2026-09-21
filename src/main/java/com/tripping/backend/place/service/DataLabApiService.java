@@ -50,6 +50,9 @@ public class DataLabApiService {
     private static final DateTimeFormatter YMD = DateTimeFormatter.BASIC_ISO_DATE;
     private static final int MAX_PAGES = 50; // 안전장치 - 무한루프 방지
     private static final int RELIABLE_ROW_COUNT = 3; // touDivCd(현지인/외지인/외국인) 3개가 다 있어야 신뢰
+    // 전국 일괄 조회에 쓰는 고정 창. 최근 1년 구간에서 작년 동기(364일 전)까지 보려면
+    // 2년치가 필요해서 넉넉히 잡는다. 어차피 이 API는 범위와 무관하게 가진 만큼 다 준다.
+    private static final int FULL_WINDOW_DAYS = 800;
 
     // 관광공사 TourAPI areaCd(우리 Region.apiAreaCd) -> 행정안전부 표준 시도코드(DataLabService 응답 areaCode).
     // ⚠️ 강원=51, 전북=52는 실제 API 응답 데이터로 검증 완료된 값. 수정하지 말 것.
@@ -134,6 +137,58 @@ public class DataLabApiService {
             LocalDate date = entry.getKey();
             result.put(date, new DailyVisitorAggregate(entry.getValue(), counts.getOrDefault(date, 0)));
         }
+        return result;
+    }
+
+    /**
+     * 전국 17개 시도의 일자별 방문자수를 한 번의 조회로 모두 받아온다.
+     * 반환 구조는 (TourAPI areaCd -> (날짜 -> 집계)).
+     * <p>
+     * 이 API는 요청한 날짜 범위와 무관하게 매번 전국 약 1년치(약 17,000건, 17페이지)를
+     * 통째로 내려준다. 그래서 지역별·기간별로 따로 부르면 같은 응답을 계속 다시 받게 된다.
+     * (지역을 바꾸거나 기간 탭을 누를 때마다 화면이 몇 초씩 멈추던 원인)
+     * <p>
+     * 파라미터를 받지 않고 조회 창을 내부에서 고정하는 이유가 여기 있다 —
+     * 호출부가 어떤 기간을 보든 캐시 키가 "오늘" 하나로 모여서, 하루에 한 번만
+     * 실제 호출이 나가고 그 뒤로는 모든 지역·모든 기간이 즉시 응답한다.
+     */
+    @Cacheable(cacheNames = CacheConfig.DATA_LAB_DAILY_VISITORS_CACHE,
+            key = "'ALL_DAILY_' + T(java.time.LocalDate).now().toString()")
+    public Map<String, Map<LocalDate, DailyVisitorAggregate>> fetchAllRegionDailyAggregates() {
+        LocalDate end = LocalDate.now();
+        LocalDate start = end.minusDays(FULL_WINDOW_DAYS);
+
+        // areaCode -> (날짜 -> [합계, 행 개수])
+        Map<String, Map<LocalDate, long[]>> perArea = new HashMap<>();
+
+        forEachItem(start, end, item -> {
+            String itemAreaCode = item.path("areaCode").asText(null);
+            if (itemAreaCode == null) {
+                return;
+            }
+            LocalDate date = parseBaseYmd(item);
+            if (date == null) {
+                return;
+            }
+            long[] slot = perArea
+                    .computeIfAbsent(itemAreaCode, k -> new TreeMap<>())
+                    .computeIfAbsent(date, k -> new long[2]);
+            slot[0] += Math.round(item.path("touNum").asDouble(0));
+            slot[1] += 1;
+        }, "allRegionsDaily");
+
+        // 응답의 행안부 표준코드를 우리 Region.apiAreaCd 체계로 되돌려서 담는다.
+        Map<String, Map<LocalDate, DailyVisitorAggregate>> result = new HashMap<>();
+        perArea.forEach((areaCode, byDate) -> {
+            String tourAreaCd = DATALAB_AREA_CODE_TO_TOUR_AREA_CD.get(areaCode);
+            if (tourAreaCd == null) {
+                return;
+            }
+            Map<LocalDate, DailyVisitorAggregate> converted = new TreeMap<>();
+            byDate.forEach((date, slot) ->
+                    converted.put(date, new DailyVisitorAggregate(slot[0], (int) slot[1])));
+            result.put(tourAreaCd, converted);
+        });
         return result;
     }
 

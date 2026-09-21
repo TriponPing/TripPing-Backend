@@ -9,6 +9,7 @@ import com.tripping.backend.place.service.DataLabApiService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -27,6 +28,7 @@ public class DashboardService {
 
     private static final int MAX_NETWORK_NODES = 30;
     private static final int MAX_NETWORK_EDGES = 60;
+    private static final int MIN_RELIABLE_ROW_COUNT = 3; // touDivCd 3종이 다 모인 날짜만 신뢰
 
     private final DashboardRepository dashboardRepository;
     private final InsightRouteRepository insightRouteRepository;
@@ -76,8 +78,29 @@ public class DashboardService {
             pingsByRegionName.merge(row.getRegionName(), nullToZero(row.getVisitCount()), Long::sum);
         }
 
-        // 2) 관광공사 기준 지역별 총 방문자수 (전국이 한 번에 오므로 호출은 1회)
-        Map<String, Long> visitorsByAreaCd = dataLabApiService.fetchRegionTotals(current.start(), current.end());
+        // 2) 관광공사 기준 지역별 총 방문자수.
+        // 전국 일자별 응답을 하루 한 번만 받아 캐시해두고(트렌드 화면과 같은 캐시를 공유한다)
+        // 여기서 선택한 구간만 잘라 합산한다 — 지역·기간을 바꿔도 추가 호출이 없다.
+        Map<String, Map<LocalDate, DataLabApiService.DailyVisitorAggregate>> byRegion =
+                dataLabApiService.fetchAllRegionDailyAggregates();
+
+        Map<String, Long> visitorsByAreaCd = new java.util.HashMap<>();
+        byRegion.forEach((areaCd, aggregates) -> {
+            long sum = 0;
+            for (Map.Entry<LocalDate, DataLabApiService.DailyVisitorAggregate> entry : aggregates.entrySet()) {
+                LocalDate date = entry.getKey();
+                if (date.isBefore(current.start()) || date.isAfter(current.end())) {
+                    continue;
+                }
+                if (entry.getValue().rowCount() < MIN_RELIABLE_ROW_COUNT) {
+                    continue;
+                }
+                sum += entry.getValue().totalVisitors();
+            }
+            if (sum > 0) {
+                visitorsByAreaCd.put(areaCd, sum);
+            }
+        });
 
         // 3) 관광공사 지역코드가 매핑된 시도 목록을 기준으로 두 값을 합친다.
         //    핑이 0인 지역도 빠지지 않고 다 나온다.
