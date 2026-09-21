@@ -153,6 +153,14 @@ public class InsightService {
                 ? sumAllRegions(byRegion)
                 : reliableOnly(byRegion.getOrDefault(areaCd, Map.of()));
 
+        // 실측이 단 하나도 없으면 추정의 근거 자체가 없다. 이때 0으로 채운 값을 내려보내면
+        // 화면에 "0이 계속된다"는 잘못된 사실이 그려진다(관광공사 API 호출이 실패했을 때
+        // 실제로 그렇게 보였다). 데이터가 없다는 것과 0이라는 것은 다르므로, 빈 응답을
+        // 내려서 프론트가 참고선을 아예 숨기게 한다.
+        if (actualByDate.isEmpty()) {
+            return List.of();
+        }
+
         // 3) 보정계수 계산 (최근 4주 vs 작년 같은 4주)
         double correctionFactor = calculateCorrectionFactor(actualByDate);
 

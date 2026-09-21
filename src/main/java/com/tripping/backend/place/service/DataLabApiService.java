@@ -1,8 +1,10 @@
 package com.tripping.backend.place.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tripping.backend.global.config.CacheConfig;
+import java.io.File;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -50,9 +52,15 @@ public class DataLabApiService {
     private static final DateTimeFormatter YMD = DateTimeFormatter.BASIC_ISO_DATE;
     private static final int MAX_PAGES = 50; // 안전장치 - 무한루프 방지
     private static final int RELIABLE_ROW_COUNT = 3; // touDivCd(현지인/외지인/외국인) 3개가 다 있어야 신뢰
-    // 전국 일괄 조회에 쓰는 고정 창. 최근 1년 구간에서 작년 동기(364일 전)까지 보려면
-    // 2년치가 필요해서 넉넉히 잡는다. 어차피 이 API는 범위와 무관하게 가진 만큼 다 준다.
-    private static final int FULL_WINDOW_DAYS = 800;
+    // 전국 일괄 조회에 쓰는 고정 창.
+    // ⚠️ 이 값을 늘리지 말 것. 최근 1년 구간에서 작년 동기(364일 전)까지 보려면 2년치가
+    // 필요해 보이지만, 범위를 더 넓히면 API가 응답을 거부해 빈 값이 돌아온다.
+    // 765일은 예전 구현(요청 구간 시작일 - 400일)이 "최근 1년"에서 실제로 쓰던 범위와
+    // 같은 값이라 동작이 검증되어 있다.
+    private static final int FULL_WINDOW_DAYS = 765;
+    // 마지막으로 성공한 전국 응답을 남겨두는 파일. 일일 요청 한도를 소진했거나 호출이
+    // 실패했을 때 이 값으로 화면을 채운다. 서버 작업 디렉터리에 생성된다.
+    private static final String SNAPSHOT_FILE = "datalab-snapshot.json";
 
     // 관광공사 TourAPI areaCd(우리 Region.apiAreaCd) -> 행정안전부 표준 시도코드(DataLabService 응답 areaCode).
     // ⚠️ 강원=51, 전북=52는 실제 API 응답 데이터로 검증 완료된 값. 수정하지 말 것.
@@ -152,8 +160,12 @@ public class DataLabApiService {
      * 호출부가 어떤 기간을 보든 캐시 키가 "오늘" 하나로 모여서, 하루에 한 번만
      * 실제 호출이 나가고 그 뒤로는 모든 지역·모든 기간이 즉시 응답한다.
      */
+    // unless가 중요하다 — 호출이 실패하면 이 메서드는 빈 Map을 반환하는데, 그것까지
+    // 캐시되면 그날 하루 내내 빈 값만 돌려주게 된다(차트가 0으로 고정된다).
+    // 빈 결과는 캐시하지 않아서, 다음 요청 때 자연히 다시 시도된다.
     @Cacheable(cacheNames = CacheConfig.DATA_LAB_DAILY_VISITORS_CACHE,
-            key = "'ALL_DAILY_' + T(java.time.LocalDate).now().toString()")
+            key = "'ALL_DAILY_' + T(java.time.LocalDate).now().toString()",
+            unless = "#result.isEmpty()")
     public Map<String, Map<LocalDate, DailyVisitorAggregate>> fetchAllRegionDailyAggregates() {
         LocalDate end = LocalDate.now();
         LocalDate start = end.minusDays(FULL_WINDOW_DAYS);
@@ -189,6 +201,62 @@ public class DataLabApiService {
                     converted.put(date, new DailyVisitorAggregate(slot[0], (int) slot[1])));
             result.put(tourAreaCd, converted);
         });
+
+        // 호출이 실패하면(일일 요청 한도 초과 등) 마지막으로 받아둔 스냅샷으로 버틴다.
+        // 이 API는 하루 요청 횟수가 제한되어 있고 한 번 조회에 十수 회가 나가기 때문에,
+        // 서버를 재시작할 때마다 새로 받으면 금방 한도를 소진한다.
+        if (result.isEmpty()) {
+            Map<String, Map<LocalDate, DailyVisitorAggregate>> snapshot = loadSnapshot();
+            if (!snapshot.isEmpty()) {
+                log.warn("DataLab 호출 실패 - 마지막 스냅샷({}개 시도)으로 대체합니다.", snapshot.size());
+            }
+            return snapshot;
+        }
+
+        saveSnapshot(result);
+        return result;
+    }
+
+    // 성공한 응답을 파일로 남겨둔다. 서버를 재시작해도 이 값으로 화면을 채울 수 있어
+    // 불필요한 재조회를 막는다. 저장에 실패해도 조회 자체에는 영향을 주지 않는다.
+    private void saveSnapshot(Map<String, Map<LocalDate, DailyVisitorAggregate>> data) {
+        try {
+            Map<String, Map<String, long[]>> plain = new HashMap<>();
+            data.forEach((areaCd, byDate) -> {
+                Map<String, long[]> converted = new TreeMap<>();
+                byDate.forEach((date, aggregate) ->
+                        converted.put(date.toString(),
+                                new long[]{aggregate.totalVisitors(), aggregate.rowCount()}));
+                plain.put(areaCd, converted);
+            });
+            objectMapper.writeValue(new File(SNAPSHOT_FILE), plain);
+        } catch (Exception e) {
+            log.warn("DataLab 스냅샷 저장 실패: {}", e.getMessage());
+        }
+    }
+
+    private Map<String, Map<LocalDate, DailyVisitorAggregate>> loadSnapshot() {
+        Map<String, Map<LocalDate, DailyVisitorAggregate>> result = new HashMap<>();
+        try {
+            File file = new File(SNAPSHOT_FILE);
+            if (!file.exists()) {
+                return result;
+            }
+            Map<String, Map<String, long[]>> plain =
+                    objectMapper.readValue(file, new TypeReference<Map<String, Map<String, long[]>>>() {});
+            plain.forEach((areaCd, byDate) -> {
+                Map<LocalDate, DailyVisitorAggregate> converted = new TreeMap<>();
+                byDate.forEach((date, slot) -> {
+                    if (slot != null && slot.length == 2) {
+                        converted.put(LocalDate.parse(date), new DailyVisitorAggregate(slot[0], (int) slot[1]));
+                    }
+                });
+                result.put(areaCd, converted);
+            });
+        } catch (Exception e) {
+            log.warn("DataLab 스냅샷 읽기 실패: {}", e.getMessage());
+            return new HashMap<>();
+        }
         return result;
     }
 
