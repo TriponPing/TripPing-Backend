@@ -4,6 +4,18 @@ server:
   port: ${PORT:8080}
   tomcat:
     uri-encoding: UTF-8
+  # 👈 새로 추가: 로그인 세션 쿠키 설정.
+  # 프론트와 백엔드가 서로 다른 도메인에 배포되면 세션 쿠키가 "서드파티 쿠키"가 되어
+  # 브라우저가 기본값(SameSite=Lax)에서는 아예 보내지 않는다. 그러면 로그인은 성공해도
+  # 바로 다음 요청에서 인증이 풀려 로그인 화면으로 계속 튕긴다(CORS 에러는 안 난다).
+  #
+  # 배포 환경에서는 COOKIE_SAME_SITE=none, COOKIE_SECURE=true 를 환경변수로 넣는다.
+  # 로컬은 http라서 Secure 쿠키를 쓸 수 없으므로 기본값(lax/false)을 그대로 둔다.
+  servlet:
+    session:
+      cookie:
+        same-site: ${COOKIE_SAME_SITE:lax}
+        secure: ${COOKIE_SECURE:false}
 
 spring:
   datasource:
